@@ -23,6 +23,13 @@ internal const val MIN_SWEEP: Float = 1f
 internal const val INNER_FEATURES_THRESHOLD: Float = 0.25f
 
 /**
+ * The ratio (0..1) that [px] is of [whole], both in px: what a size given in px is worth as one of
+ * the chart's ratios. 0 when there is nothing to take a share of.
+ */
+internal fun ratioOfPx(px: Float, whole: Float): Float =
+    if (whole > 0f) (px / whole).coerceIn(0f, 1f) else 0f
+
+/**
  * The gap actually used for [sliceCount] slices: 0 for a single slice,
  * clamped so every slice can still show at least [MIN_SWEEP] when
  * [ensureRenderableSlices] is on.

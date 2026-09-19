@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `setStyle` overload with the hole, the corner radius and the shadow offset in px (`holeRadiusPx`, `cornerRadiusPx`,
+  `selectedShadowOffsetPx`). They are converted to ratios at the chart's size, and the ratios are what is drawn.
+  `CenterVisibility.MinHoleRadiusPx` shows the center while the hole is at least that many px. Ratios work as before.
+  A `when` over `CenterVisibility` needs a branch for the new case.
+
 ## 1.0.0
 
 First public version.

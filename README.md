@@ -123,6 +123,24 @@ chart.setStyle(
 | `selectedShadowOffsetRatio` | `0.06` | Shadow shift as a share of the hole radius; never more than half the ring thickness. |
 | `disabledColor` | light gray | Color of the empty-state ring. |
 
+**Exact sizes in px.** The hole, the corner radius and the shadow offset can also be given in pixels instead of as
+ratios, with the same `setStyle`:
+
+```kotlin
+val density = resources.displayMetrics.density
+chart.setStyle(
+    holeRadiusPx = 96 * density,          // instead of holeRadiusRatio
+    cornerRadiusPx = 8 * density,         // instead of cornerRadiusRatio
+    selectedShadowOffsetPx = 4 * density, // instead of selectedShadowOffsetRatio
+)
+```
+
+The chart draws with ratios, so the sizes are converted to ratios at the chart's size at that moment (once it has a
+size, if it is not laid out yet). The ratios are what stays if the chart is resized afterwards, and the ratio
+properties hold them. The limits are those of the ratios (a hole is at most the chart's radius, a corner at most half
+the ring's thickness, a shadow shift at most the hole's radius and half the thickness). A size in px wins over the
+ratio of the same name in the same call. The gap between slices is an angle, so it has no px form.
+
 Animations: `setAnimationConfig(revealAnimationDuration, revealAnimationInterpolator, dataChangeAnimationDuration, dataChangeAnimationInterpolator)`
 (defaults: 600 ms each). Padding works as on any view and the chart is drawn in the largest circle inside it.
 
@@ -161,7 +179,7 @@ chart.centerRenderer = DefaultCenterRenderer(
 - The text is sized for the selected slice alone, so a short value is not shrunk because another slice has a long one.
 - **Whether the center is shown** is decided from *every* slice, each at its smallest size, so it never comes and goes
   as the selection moves. Control it with `chart.centerVisibility`:
-  `WhenFits` (default), `Always`, `Never` or `MinHoleRatio(ratio)`.
+  `WhenFits` (default), `Always`, `Never`, `MinHoleRatio(ratio)` or `MinHoleRadiusPx(px)`.
 
 **Your own content.** Implement `CenterRenderer`; the chart handles when to show it and the fading:
 
