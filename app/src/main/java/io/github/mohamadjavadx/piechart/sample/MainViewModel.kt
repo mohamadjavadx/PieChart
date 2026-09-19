@@ -13,6 +13,7 @@ import io.github.mohamadjavadx.piechart.sample.model.DefaultControls
 import io.github.mohamadjavadx.piechart.sample.model.IntControl
 import io.github.mohamadjavadx.piechart.sample.model.ListState
 import io.github.mohamadjavadx.piechart.sample.model.SampleTab
+import io.github.mohamadjavadx.piechart.sample.model.maxCornerRadius
 import io.github.mohamadjavadx.piechart.sample.model.rowId
 import io.github.mohamadjavadx.piechart.sample.model.toChartStyle
 import java.math.BigDecimal
@@ -28,6 +29,9 @@ import kotlinx.coroutines.flow.update
 internal class MainViewModel : ViewModel() {
 
     private val _controls = MutableStateFlow(DefaultControls)
+
+    /** The corner radius the user picked; the slider shows less of it while the hole ratio is small. */
+    private var chosenCornerRadius = defaultCornerRadius()
 
     private var nextRowId = 1
 
@@ -77,10 +81,21 @@ internal class MainViewModel : ViewModel() {
     }
 
     fun updateIntControl(control: IntControl, value: Int) {
-        replaceControl(control.withValue(value))
+        if (control.id == ChartSetting.CornerRadius.id) chosenCornerRadius = value
+        // One update, so that the chart gets the new hole ratio and corner radius together.
+        _controls.update { controls ->
+            val updated = controls.map { if (it.id == control.id) control.withValue(value) else it }
+            if (control.id == ChartSetting.HoleRatio.id) updated.withCornerRadiusFor(holeRatio = value) else updated
+        }
         if (control.id == ChartSetting.Segments.id) {
             resizeDataSet(value, NewRowFocus.IfValueEmpty)
         }
+    }
+
+    /** The chosen corner radius, held back to what a small hole ratio allows; it comes back as the hole grows. */
+    private fun List<Control>.withCornerRadiusFor(holeRatio: Int): List<Control> = map {
+        if (it.id != ChartSetting.CornerRadius.id) return@map it
+        (it as IntControl).withValue(minOf(chosenCornerRadius, maxCornerRadius(holeRatio)))
     }
 
     fun updateBooleanControl(control: BooleanControl, value: Boolean) {
@@ -188,10 +203,14 @@ internal class MainViewModel : ViewModel() {
     /** Back to the initial state: default controls and the generated data set. */
     private fun restoreSettings() {
         _controls.value = DefaultControls
+        chosenCornerRadius = defaultCornerRadius()
         editedValueIds.clear()
         _dataSet.value = resized(emptyList(), defaultSegmentCount())
         _selectedRowId.value = _dataSet.value.firstOrNull()?.rowId
     }
+
+    private fun defaultCornerRadius(): Int =
+        (DefaultControls.first { it.id == ChartSetting.CornerRadius.id } as IntControl).value
 
     private fun defaultSegmentCount(): Int =
         (DefaultControls.first { it.id == ChartSetting.Segments.id } as IntControl).value

@@ -8,6 +8,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.view.ViewCompat
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.sp
 
@@ -34,26 +35,35 @@ internal abstract class IntControlView(
     protected var valueString = "0"
         private set
 
-    var value: Int = 0
+    private var current = 0
+
+    var value: Int
+        get() = current
         set(newValue) {
-            val clamped = newValue.coerceIn(0, maxValue)
-            if (field == clamped) return
-            field = clamped
-            refreshValueText()
-            invalidate()
+            if (storeValue(newValue)) invalidate()
         }
 
     var maxValue: Int = 100
         set(newValue) {
-            field = newValue
-            value = value // re-clamp against the new range
+            field = newValue.coerceAtLeast(0)
+            storeValue(current) // re-clamp against the new range
             invalidate()
         }
+
+    /** Keeps [newValue] within 0..[maxValue] as the value; returns whether the value changed. Does not redraw. */
+    private fun storeValue(newValue: Int): Boolean {
+        val clamped = newValue.coerceIn(0, maxValue)
+        if (current == clamped) return false
+        current = clamped
+        refreshValueText()
+        return true
+    }
 
     /** [format] holds one `%d` for the current value, e.g. `"Gap %d°"`; `%%` is a literal `%`. */
     fun setLabelFormat(format: String) {
         leftText = format.substringBefore("%d").replace("%%", "%")
         rightText = format.substringAfter("%d", "").replace("%%", "%")
+        contentDescription = leftText.trim()
         refreshValueText()
         invalidate()
     }
@@ -79,6 +89,7 @@ internal abstract class IntControlView(
     private fun refreshValueText() {
         valueString = value.toString()
         valueText = valueString + rightText
+        ViewCompat.setStateDescription(this, valueText)
     }
 
     private fun boldTextPaint(color: Int) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {

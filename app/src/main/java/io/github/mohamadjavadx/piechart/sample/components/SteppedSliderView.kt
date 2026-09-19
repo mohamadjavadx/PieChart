@@ -36,7 +36,8 @@ internal class SteppedSliderView @JvmOverloads constructor(
     private var trackStartX = 0f
     private var trackEndX = 0f
     private var trackWidth = 0f
-    private var trackCenterY = 0f
+    override var trackCenterY = 0f
+        private set
 
     private val bgRect = RectF()
     private val activeRect = RectF()
@@ -49,11 +50,13 @@ internal class SteppedSliderView @JvmOverloads constructor(
     private val dotSpacing: Float
         get() = if (maxValue > 0) (trackWidth - 2 * dotMargin) / maxValue else 0f
 
+    private fun dotX(index: Int, spacing: Float) = trackStartX + dotMargin + index * spacing
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val contentHeight = labelPaint.textSize + 16.dpf + trackHeight
         val desiredHeight = (paddingTop + contentHeight + paddingBottom).toInt()
         setMeasuredDimension(
-            MeasureSpec.getSize(widthMeasureSpec),
+            getDefaultSize(suggestedMinimumWidth, widthMeasureSpec),
             resolveSize(desiredHeight, heightMeasureSpec)
         )
     }
@@ -85,16 +88,17 @@ internal class SteppedSliderView @JvmOverloads constructor(
 
         // Dots inside the active track are cut out in the track's background color.
         for (i in 0..maxValue) {
-            val dotX = trackStartX + dotMargin + i * spacing
-            dotPaint.color = if (dotX <= activeEndX) Colors.colorStroke else Colors.colorDivider
-            canvas.drawCircle(dotX, trackCenterY, dotRadius, dotPaint)
+            val x = dotX(i, spacing)
+            dotPaint.color = if (x <= activeEndX) Colors.colorStroke else Colors.colorDivider
+            canvas.drawCircle(x, trackCenterY, dotRadius, dotPaint)
         }
+        drawTouchIndicator(canvas, dotX(value, spacing), trackCenterY)
     }
 
     override fun valueAt(x: Float): Int {
         val spacing = dotSpacing
         if (trackWidth <= 0f || spacing <= 0f) return value
-        val step = (x.coerceIn(trackStartX, trackEndX) - (trackStartX + dotMargin)) / spacing
+        val step = (x.coerceIn(trackStartX, trackEndX) - dotX(0, spacing)) / spacing
         return step.roundToInt().coerceIn(0, maxValue)
     }
 }
