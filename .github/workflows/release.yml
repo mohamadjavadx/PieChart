@@ -1,0 +1,176 @@
+name: Release
+
+# Pushing a tag such as v1.0.0 builds the library and the demo app, creates a GitHub Release with the
+# files attached, and then asks JitPack to build the tag.
+#
+# Before tagging: set `version` in piechart/build.gradle.kts to the tag without the "v", and add a
+# "## <version>" section to CHANGELOG.md; its text becomes the release notes.
+#
+# If a run fails, fix the problem and run this workflow again by hand ("Run workflow") with the tag.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing tag to (re)release, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check the tag against the library version and the changelog
+        id: version
+        run: |
+          VERSION="${TAG#v}"
+          LIB_VERSION="$(./gradlew -q :piechart:properties | awk '/^version:/ {print $2}')"
+          if [ "$LIB_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match the library version $LIB_VERSION in piechart/build.gradle.kts"
+            exit 1
+          fi
+          awk -v v="$VERSION" '$0 ~ "^## " v "( |$)" {p=1; next} /^## /{p=0} p' CHANGELOG.md > "$RUNNER_TEMP/changelog.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/changelog.md"; then
+            echo "::error::CHANGELOG.md has no '## $VERSION' section (or it is empty)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Signing key for the demo app (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            {
+              echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore"
+              echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
+              echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+              echo "APK_SIGNING=release key"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing secrets are set, so the demo APK is signed with a throw-away debug key (see docs/RELEASING.md)."
+            echo "APK_SIGNING=debug key" >> "$GITHUB_ENV"
+          fi
+
+      - name: Lint and build the library and the demo app
+        run: ./gradlew :piechart:lintRelease :piechart:publishToMavenLocal :app:assembleRelease -Dmaven.repo.local="$RUNNER_TEMP/m2" --stacktrace
+
+      - name: Collect the files to attach
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          lib="$RUNNER_TEMP/m2/io/github/mohamadjavadx/piechart/$VERSION"
+          mkdir dist
+          cp "$lib"/piechart-"$VERSION".aar "$lib"/piechart-"$VERSION".pom "$lib"/piechart-"$VERSION".module dist/
+          cp "$lib"/piechart-"$VERSION"-sources.jar "$lib"/piechart-"$VERSION"-javadoc.jar dist/
+          cp app/build/outputs/apk/release/app-release.apk "dist/PieChart-demo-$VERSION.apk"
+          cp app/build/outputs/mapping/release/mapping.txt "dist/PieChart-demo-$VERSION-mapping.txt"
+          ls -l dist
+
+      - name: Write the release notes
+        run: |
+          OWNER="$GITHUB_REPOSITORY_OWNER"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          VERSION="${{ steps.version.outputs.version }}"
+          {
+            cat "$RUNNER_TEMP/changelog.md"
+            echo
+            echo "### Install"
+            echo
+            echo '```kotlin'
+            echo '// settings.gradle.kts'
+            echo 'dependencyResolutionManagement {'
+            echo '    repositories {'
+            echo '        google()'
+            echo '        mavenCentral()'
+            echo '        maven("https://jitpack.io")'
+            echo '    }'
+            echo '}'
+            echo
+            echo '// build.gradle.kts of your app'
+            echo 'dependencies {'
+            echo "    implementation(\"com.github.$OWNER:$REPO:$TAG\")"
+            echo '}'
+            echo '```'
+            echo
+            echo "Requires \`minSdk 24\`. The \`.aar\`, sources, javadoc, \`.pom\` and \`.module\` are attached below."
+            echo
+            echo "### Demo app"
+            echo
+            echo "\`PieChart-demo-$VERSION.apk\` is the demo (a settings playground for the chart): a release build shrunk with R8, signed with the $APK_SIGNING. \`PieChart-demo-$VERSION-mapping.txt\` turns its obfuscated stack traces back into readable ones."
+            if [ "$APK_SIGNING" = "debug key" ]; then
+              echo "Because of the debug key, you may need to allow installing from your browser or file manager, and it cannot be updated in place by a build signed with another key."
+            fi
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Create (or update) the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+          else
+            gh release create "$TAG" dist/* --verify-tag --title "${TAG#v}" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+          fi
+
+  jitpack:
+    needs: release
+    runs-on: ubuntu-latest
+    # A slow or failing JitPack build must not turn a finished release red; it can be requested again later.
+    continue-on-error: true
+    steps:
+      - name: Ask JitPack to build the tag and wait for it
+        run: |
+          OWNER="$GITHUB_REPOSITORY_OWNER"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          BASE="https://jitpack.io/com/github/$OWNER/$REPO/$TAG"
+          # The first request for a tag starts its build. This one may time out while the build runs.
+          curl -sL -m 120 -o /dev/null "$BASE/$REPO-$TAG.pom" || true
+          status=none
+          for i in $(seq 1 60); do
+            status="$(curl -s -m 30 "https://jitpack.io/api/builds/com.github.$OWNER/$REPO/$TAG" | jq -r '.status // "none"')"
+            echo "JitPack build: $status"
+            case "$status" in ok | error | Error) break ;; esac
+            sleep 20
+          done
+          if [ "$status" != ok ]; then
+            echo "::error::JitPack did not build $TAG (status: $status). Log: $BASE/build.log"
+            exit 1
+          fi
+          for ext in pom aar; do
+            code="$(curl -sL -m 60 -o /dev/null -w '%{http_code}' "$BASE/$REPO-$TAG.$ext")"
+            echo "$REPO-$TAG.$ext -> HTTP $code"
+            [ "$code" = 200 ] || exit 1
+          done
+          echo "### JitPack" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`com.github.$OWNER:$REPO:$TAG\` is available on JitPack." >> "$GITHUB_STEP_SUMMARY"

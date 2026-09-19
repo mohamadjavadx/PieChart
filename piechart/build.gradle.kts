@@ -1,0 +1,125 @@
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+
+plugins {
+    alias(libs.plugins.android.library)
+    `maven-publish`
+    signing
+}
+
+// ---------------------------------------------------------------------------------------------
+// Release details. Publishing to a remote repository refuses to run while any TODO/OWNER is left.
+// ---------------------------------------------------------------------------------------------
+group = "io.github.mohamadjavadx"
+version = "1.0.0"
+
+val pomName = "PieChart"
+val pomDescription = "An animated pie / donut chart view for Android, with tap selection and " +
+    "the selected slice's details drawn in the hole."
+val pomUrl = "https://github.com/mohamadjavadx/PieChart"
+val pomLicenseName = "The Apache License, Version 2.0"
+val pomLicenseUrl = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+val pomDeveloperId = "mohamadjavadx"
+val pomDeveloperName = "Mohamadjavad Pourmoradian"
+
+android {
+    namespace = "io.github.mohamadjavadx.piechart"
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        minSdk = 24
+
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+kotlin {
+    // Everything public in this library must be marked public on purpose.
+    explicitApi()
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            register<MavenPublication>("release") {
+                from(components["release"])
+                artifactId = "piechart"
+
+                pom {
+                    name.set(pomName)
+                    description.set(pomDescription)
+                    url.set(pomUrl)
+                    licenses {
+                        license {
+                            name.set(pomLicenseName)
+                            url.set(pomLicenseUrl)
+                        }
+                    }
+                    developers {
+                        developer {
+                            id.set(pomDeveloperId)
+                            name.set(pomDeveloperName)
+                        }
+                    }
+                    scm {
+                        url.set(pomUrl)
+                        connection.set("scm:git:$pomUrl.git")
+                        developerConnection.set("scm:git:$pomUrl.git")
+                    }
+                }
+            }
+        }
+    }
+
+    // Signing is only switched on when a key is provided (Maven Central needs it, JitPack and
+    // publishToMavenLocal do not): -PsigningInMemoryKey=... -PsigningInMemoryKeyPassword=...
+    signing {
+        val key = providers.gradleProperty("signingInMemoryKey").orNull
+        if (key != null) {
+            useInMemoryPgpKeys(key, providers.gradleProperty("signingInMemoryKeyPassword").orNull)
+            sign(publishing.publications)
+        }
+    }
+}
+
+tasks.withType<PublishToMavenRepository>().configureEach {
+    doFirst {
+        val unset = mapOf(
+            "pomUrl" to pomUrl,
+            "pomLicenseName" to pomLicenseName,
+            "pomLicenseUrl" to pomLicenseUrl,
+            "pomDeveloperName" to pomDeveloperName,
+        ).filterValues { it.contains("TODO") || it.contains("OWNER") }.keys
+        check(unset.isEmpty()) {
+            "Fill in the release details at the top of piechart/build.gradle.kts first: $unset"
+        }
+    }
+}

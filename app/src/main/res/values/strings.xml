@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">PieChart</string>
+    <string name="chart_title">Pie Chart</string>
+    <string name="tab_chart_settings">Chart Setting</string>
+    <string name="tab_data">Data</string>
+    <string name="hint_label">Label</string>
+    <string name="hint_value">Value</string>
+</resources>
