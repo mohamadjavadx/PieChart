@@ -11,10 +11,18 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.TextPaint
+import android.os.Bundle
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.TabWidget
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import io.github.mohamadjavadx.piechart.sample.R
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.dp
 import io.github.mohamadjavadx.piechart.sample.utils.dpf
@@ -73,6 +81,7 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
     private var pillBitmap: Bitmap? = null
     private val shadowMargin = 6.dp // covers the 2dp blur plus the 2dp offset
     private var calculatedSelectorWidth = 0f
+    private var gradientHeight = 0
     private var segmentCenters = FloatArray(0)
     private var dividerXs = FloatArray(0)
 
@@ -80,7 +89,10 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
         set(value) {
             field = value
             ripples = List(value.size) { RippleFade(this) }
+            segmentCenters = FloatArray(value.size)
+            dividerXs = FloatArray((value.size - 1).coerceAtLeast(0))
             if (selectedIndex >= value.size) selectedIndex = 0
+            updateStateDescription()
             requestLayout()
             invalidate()
         }
@@ -90,6 +102,7 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
         set(value) {
             if (value !in items.indices || field == value) return
             field = value
+            updateStateDescription()
             invalidate()
         }
 
@@ -103,8 +116,8 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
     private var pressedIndex = -1
 
     init {
-        isClickable = true
         isFocusable = true
+        contentDescription = context.getString(R.string.tab_selector_description)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -124,13 +137,16 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
         val w = right - left
         val h = bottom - top
 
-        // Transparent at the top, the background color at the bottom.
-        bgGradientPaint.shader = LinearGradient(
-            0f, 0f, 0f, h.toFloat(),
-            ColorUtils.setAlphaComponent(Colors.colorBackground, 0),
-            Colors.colorBackground,
-            Shader.TileMode.CLAMP
-        )
+        // Transparent at the top, the background color at the bottom; only the height matters.
+        if (bgGradientPaint.shader == null || gradientHeight != h) {
+            gradientHeight = h
+            bgGradientPaint.shader = LinearGradient(
+                0f, 0f, 0f, h.toFloat(),
+                ColorUtils.setAlphaComponent(Colors.colorBackground, 0),
+                Colors.colorBackground,
+                Shader.TileMode.CLAMP
+            )
+        }
 
         val selectorWidth = min(calculatedSelectorWidth, w.toFloat())
         val selectorLeft = (w - selectorWidth) / 2f
@@ -139,8 +155,6 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
         bgPath.addRoundRect(bgRect, cornerRadius, cornerRadius, Path.Direction.CW)
         updatePillBitmap()
 
-        segmentCenters = FloatArray(items.size)
-        dividerXs = FloatArray((items.size - 1).coerceAtLeast(0))
         if (items.size == 1) {
             segmentCenters[0] = bgRect.centerX()
             return
@@ -248,10 +262,7 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
                 if (pressed != -1) {
                     ripples[pressed].fadeOut()
                     if (indexAt(event.x, event.y) == pressed) {
-                        if (pressed != selectedIndex) {
-                            selectedIndex = pressed
-                            selectionChangeListener?.invoke(pressed)
-                        }
+                        selectByUser(pressed)
                         performClick()
                     }
                 }
@@ -265,6 +276,45 @@ internal class SegmentedSelectorView @JvmOverloads constructor(
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    /** A change the user asked for, by touch, by key or through a screen reader: it is reported too. */
+    private fun selectByUser(index: Int) {
+        if (index !in items.indices || index == selectedIndex) return
+        selectedIndex = index
+        selectionChangeListener?.invoke(index)
+    }
+
+    private fun updateStateDescription() {
+        ViewCompat.setStateDescription(this, items.getOrNull(selectedIndex))
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> selectByUser(selectedIndex - 1)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> selectByUser(selectedIndex + 1)
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        return true
+    }
+
+    // Read as one control that has the tab that is showing as its state, and that steps between tabs.
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        AccessibilityNodeInfoCompat.wrap(info).apply {
+            className = TabWidget::class.java.name
+            if (selectedIndex < items.lastIndex) addAction(AccessibilityActionCompat.ACTION_SCROLL_FORWARD)
+            if (selectedIndex > 0) addAction(AccessibilityActionCompat.ACTION_SCROLL_BACKWARD)
+        }
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        when (action) {
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD -> selectByUser(selectedIndex + 1)
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD -> selectByUser(selectedIndex - 1)
+            else -> return super.performAccessibilityAction(action, arguments)
+        }
+        return true
     }
 
     override fun onDetachedFromWindow() {

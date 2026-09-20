@@ -2,6 +2,16 @@ package io.github.mohamadjavadx.piechart
 
 import java.math.BigDecimal
 
+/**
+ * One slice of a [PieChartView].
+ *
+ * @property id Identifies the slice across data changes: a slice that keeps its id animates from its old size to its
+ * new one, and stays selected. Any object with a stable `equals` works, and ids should be unique.
+ * @property label What the slice is called, for example in the center of the chart.
+ * @property value The size of the slice, exact. Slices are drawn in proportion to the sum of the values; a
+ * slice whose value is not above zero is left out.
+ * @property color The slice's color, including its alpha (a color that is not opaque draws partly transparent).
+ */
 public data class PieChartData(
     val id: Any,
     val label: String,

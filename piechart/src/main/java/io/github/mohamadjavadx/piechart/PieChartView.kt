@@ -18,6 +18,7 @@ import io.github.mohamadjavadx.piechart.center.CenterArea
 import io.github.mohamadjavadx.piechart.center.CenterPresenter
 import io.github.mohamadjavadx.piechart.center.CenterRenderer
 import io.github.mohamadjavadx.piechart.center.CenterVisibility
+import io.github.mohamadjavadx.piechart.geometry.MAX_DEG
 import io.github.mohamadjavadx.piechart.geometry.Morph
 import io.github.mohamadjavadx.piechart.geometry.RingPathBuilder
 import io.github.mohamadjavadx.piechart.geometry.computeCornerRadii
@@ -45,8 +46,8 @@ import java.math.MathContext
  *   instead of as a ratio (in degrees for the gap), independently of each other: see [setStyle].
  * - Supports [ensureRenderableSlices] to guarantee slices are large enough to render rounded corners.
  * - Supports [roundInnerCorners] to toggle between rounded or sharp inner corners.
- * - Supports tap selection of slices with a callback; the selected slice gets a soft shadow
- *   shadow: a faded copy of the slice behind it, shifted toward the hole ([selectedShadowAlpha]).
+ * - Supports tap selection of slices with a callback; the selected slice gets a soft shadow:
+ *   a faded copy of the slice behind it, shifted toward the hole ([selectedShadowAlpha]).
  * - Can show information about the selected slice in the hole, drawn by a [CenterRenderer]
  *   (see [centerRenderer] and [CenterVisibility]).
  *
@@ -74,7 +75,8 @@ public class PieChartView(context: Context) : View(context) {
      *    outer edge.
      *
      * A setting that is not given (null) stays as it is, in the unit it has. Giving both units of
-     * one setting is an error. A size in dp stays that size when the chart is resized; the chart
+     * one setting is an error. A number that is not finite (NaN or infinity) counts as not given.
+     * A size in dp stays that size when the chart is resized; the chart
      * draws with ratios and degrees, so it works them out from the dp at the chart's size, every
      * time the chart is laid out, and the ratio and degree properties hold the result. The limits
      * are those of the ratios.
@@ -105,27 +107,27 @@ public class PieChartView(context: Context) : View(context) {
         }
 
         // A unit that is given replaces the one the setting had.
-        visualGapDeg?.let {
-            this.visualGapDeg = it.coerceAtLeast(0f)
+        visualGapDeg.finiteOrNull()?.let {
+            this.visualGapDeg = it.coerceIn(0f, MAX_DEG)
             this.visualGapDp = null
         }
-        visualGapDp?.let { this.visualGapDp = it.coerceAtLeast(0f) }
-        selectedShadowOffsetRatio?.let {
+        visualGapDp.finiteOrNull()?.let { this.visualGapDp = it.coerceAtLeast(0f) }
+        selectedShadowOffsetRatio.finiteOrNull()?.let {
             this.selectedShadowOffsetRatio = it.coerceIn(0f, 1f)
             this.selectedShadowOffsetDp = null
         }
-        selectedShadowOffsetDp?.let { this.selectedShadowOffsetDp = it.coerceAtLeast(0f) }
-        cornerRadiusRatio?.let {
+        selectedShadowOffsetDp.finiteOrNull()?.let { this.selectedShadowOffsetDp = it.coerceAtLeast(0f) }
+        cornerRadiusRatio.finiteOrNull()?.let {
             this.cornerRadiusRatio = it.coerceIn(0f, 1f)
             this.cornerRadiusDp = null
         }
-        cornerRadiusDp?.let { this.cornerRadiusDp = it.coerceAtLeast(0f) }
+        cornerRadiusDp.finiteOrNull()?.let { this.cornerRadiusDp = it.coerceAtLeast(0f) }
 
-        this.startAngleDeg = startAngleDeg
+        startAngleDeg.finiteOrNull()?.let { this.startAngleDeg = it }
+        holeRadiusRatio.finiteOrNull()?.let { this.holeRadiusRatio = it.coerceIn(0f, 1f) }
         this.selectedAlpha = selectedAlpha.coerceIn(0, 255)
         this.unselectedAlpha = unselectedAlpha.coerceIn(0, 255)
         this.selectedShadowAlpha = selectedShadowAlpha.coerceIn(0, 255)
-        this.holeRadiusRatio = holeRadiusRatio.coerceIn(0f, 1f)
         this.ensureRenderableSlices = ensureRenderableSlices
         this.roundInnerCorners = roundInnerCorners
         this.disabledColor = disabledColor
@@ -133,6 +135,9 @@ public class PieChartView(context: Context) : View(context) {
         calculateBounds(width, height)
         snapToFinalState()
     }
+
+    /** The number when it is finite, else null: NaN and infinity are treated as "not given". */
+    private fun Float?.finiteOrNull(): Float? = this?.takeIf { it.isFinite() }
 
     /**
      * Applies all animation configurations at once.
@@ -427,8 +432,9 @@ public class PieChartView(context: Context) : View(context) {
         }
     }
 
+    /** Called with the slice that a tap lands on, before it is selected; null removes the listener. */
     @MainThread
-    public fun setOnChunkClickListener(listener: (data: PieChartData) -> Unit) {
+    public fun setOnChunkClickListener(listener: ((data: PieChartData) -> Unit)?) {
         onChunkClickListener = listener
     }
 
@@ -794,7 +800,10 @@ public class PieChartView(context: Context) : View(context) {
         val availableWidth = (w - padLeft - padRight).coerceAtLeast(0f)
         val availableHeight = (h - padTop - padBottom).coerceAtLeast(0f)
 
-        if (availableWidth <= 0f || availableHeight <= 0f) return
+        if (availableWidth <= 0f || availableHeight <= 0f) {
+            clearBounds()
+            return
+        }
 
         cx = padLeft + availableWidth / 2f
         cy = padTop + availableHeight / 2f
@@ -821,7 +830,28 @@ public class PieChartView(context: Context) : View(context) {
         innerTouchBound = innerRadius - touchPaddingPx
         outerTouchBound = outerRadius + touchPaddingPx
 
-        centerArea = CenterArea(cx, cy, innerRadius)
+        updateCenterArea(cx, cy, innerRadius)
+    }
+
+    /** There is no room for a chart (the padding takes it all): draw nothing and take no touches. */
+    private fun clearBounds() {
+        outerRadius = 0f
+        innerRadius = 0f
+        sliceRing.setRing(cx, cy, 0f, 0f)
+        shadowRing.setRing(cx, cy, 0f, 0f)
+        innerTouchBound = 1f
+        outerTouchBound = 0f // an empty range: no touch is inside it
+        updateCenterArea(cx, cy, 0f)
+    }
+
+    /**
+     * The area is a new instance only when the hole changes, as [centerArea] promises, so a
+     * renderer that caches by identity keeps its work when only the style changes elsewhere.
+     */
+    private fun updateCenterArea(cx: Float, cy: Float, radius: Float) {
+        val area = centerArea
+        if (area.cx == cx && area.cy == cy && area.radius == radius) return
+        centerArea = CenterArea(cx, cy, radius)
         updateCenterAvailability()
     }
 
@@ -830,6 +860,7 @@ public class PieChartView(context: Context) : View(context) {
     // ==================================================================
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (outerRadius <= 0f) return
         if (dataset.isEmpty()) {
             drawPlaceholderSlice(canvas)
             return
@@ -845,7 +876,6 @@ public class PieChartView(context: Context) : View(context) {
      * in [disabledColor] and not interactive.
      */
     private fun drawPlaceholderSlice(canvas: Canvas) {
-        if (outerRadius <= 0f) return
         slicePaint.color = disabledColor   // setColor includes alpha, so no leftover slice alpha
         if (innerRadius <= 0f) {
             canvas.drawCircle(cx, cy, outerRadius, slicePaint)

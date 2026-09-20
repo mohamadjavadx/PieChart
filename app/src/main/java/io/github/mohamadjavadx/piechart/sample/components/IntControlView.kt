@@ -6,15 +6,26 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
+import android.os.Bundle
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.SeekBar
 import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.sp
+import kotlin.math.roundToInt
 
 /**
  * State shared by the controls that edit an integer between 0 and [maxValue]: the value, its
  * `"Label %d"` title and the change listener. Subclasses draw the control itself.
+ *
+ * To a screen reader it is a slider, whatever it looks like: it has a range, can be set to a
+ * value and stepped up and down, and the left and right arrow keys step it.
  */
 internal abstract class IntControlView(
     context: Context,
@@ -26,6 +37,10 @@ internal abstract class IntControlView(
     protected val valuePaint = boldTextPaint(Colors.colorAccent)
 
     private var valueChangeListener: ((Int) -> Unit)? = null
+
+    init {
+        isFocusable = true
+    }
 
     private var leftText = ""
     private var rightText = ""
@@ -90,6 +105,48 @@ internal abstract class IntControlView(
         valueString = value.toString()
         valueText = valueString + rightText
         ViewCompat.setStateDescription(this, valueText)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val step = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> -1
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 1
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        commitUserValue(value + step)
+        return true
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        AccessibilityNodeInfoCompat.wrap(info).apply {
+            className = SeekBar::class.java.name
+            rangeInfo = RangeInfoCompat.obtain(RangeInfoCompat.RANGE_TYPE_INT, 0f, maxValue.toFloat(), value.toFloat())
+            addAction(AccessibilityActionCompat.ACTION_SET_PROGRESS)
+            if (value < maxValue) addAction(AccessibilityActionCompat.ACTION_SCROLL_FORWARD)
+            if (value > 0) addAction(AccessibilityActionCompat.ACTION_SCROLL_BACKWARD)
+        }
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        when (action) {
+            AccessibilityActionCompat.ACTION_SET_PROGRESS.id -> {
+                val progress = arguments?.getFloat(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_PROGRESS_VALUE) ?: return false
+                commitUserValue(progress.roundToInt())
+                return true
+            }
+
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD -> {
+                commitUserValue(value + 1)
+                return true
+            }
+
+            AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD -> {
+                commitUserValue(value - 1)
+                return true
+            }
+        }
+        return super.performAccessibilityAction(action, arguments)
     }
 
     private fun boldTextPaint(color: Int) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {

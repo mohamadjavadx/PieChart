@@ -2,6 +2,16 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// The demo is versioned with the library, so that the APK of a release can update the one before it.
+evaluationDependsOn(":piechart")
+val libraryVersion = project(":piechart").version.toString()
+
+/** 1.2.3 (or 1.2.3-rc1) becomes 10203: a later version always has a higher version code. */
+fun String.toVersionCode(): Int {
+    val (major, minor, patch) = substringBefore('-').split('.').map { it.toInt() }
+    return major * 10_000 + minor * 100 + patch
+}
+
 android {
     namespace = "io.github.mohamadjavadx.piechart.sample"
     compileSdk {
@@ -14,10 +24,8 @@ android {
         applicationId = "io.github.mohamadjavadx.piechart.sample"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = libraryVersion.toVersionCode()
+        versionName = libraryVersion
     }
 
     // A release key can be provided through the environment (the release workflow does this from

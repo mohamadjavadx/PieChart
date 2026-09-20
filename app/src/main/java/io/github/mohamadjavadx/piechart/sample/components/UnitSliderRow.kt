@@ -32,7 +32,7 @@ internal class UnitSliderRow(context: Context) : FrameLayout(context) {
         addView(percentSlider, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         addView(steppedSlider, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         // The one that is not shown is invisible, not gone, so that it still counts for the height.
-        steppedSlider.visibility = View.INVISIBLE
+        steppedSlider.visibility = INVISIBLE
         addView(
             toggle,
             LayoutParams(WRAP_CONTENT, UNIT_TOGGLE_HEIGHT_DP.dp, Gravity.END or Gravity.TOP).apply {
@@ -53,8 +53,8 @@ internal class UnitSliderRow(context: Context) : FrameLayout(context) {
 
         target.animate().cancel()
         other.animate().cancel()
-        other.visibility = View.INVISIBLE
-        target.visibility = View.VISIBLE
+        other.visibility = INVISIBLE
+        target.visibility = VISIBLE
         activeSlider = target
 
         target.maxValue = item.maxValue

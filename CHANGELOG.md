@@ -7,6 +7,13 @@
   The ratio (degrees for the gap) and dp parameters of a setting are nullable, and null keeps the setting as it is.
   A size in dp stays that size when the chart is resized; `cornerRadiusDp`, `selectedShadowOffsetDp` and
   `visualGapDp` tell which unit is in charge. The signature of `setStyle` changed, so recompile against it.
+- `setStyle` ignores numbers that are not finite (NaN, infinity) instead of drawing garbage, and the gap is at most a
+  full turn.
+- `setOnChunkClickListener` accepts `null`, like `setOnSelectionChangedListener`.
+- `centerArea` is a new instance only when the hole changes, so a `CenterRenderer` that caches by identity keeps its
+  work when only another style setting changes.
+- With no room for a chart (the padding takes it all) nothing is drawn, instead of the last ring.
+- The library depends on `androidx.annotation` only, not on all of `androidx.core`.
 
 ## 1.0.0
 

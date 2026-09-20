@@ -63,7 +63,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
+    // Only for @MainThread; anything more would end up in the dependencies of every app that uses the chart.
+    implementation(libs.androidx.annotation)
 }
 
 afterEvaluate {

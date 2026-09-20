@@ -9,6 +9,9 @@ import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Button
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.dp
 import io.github.mohamadjavadx.piechart.sample.utils.dpf
@@ -44,6 +47,7 @@ internal class OutlineButtonView @JvmOverloads constructor(
     var text: String = ""
         set(value) {
             field = value
+            contentDescription = value
             invalidate()
         }
 
@@ -119,6 +123,11 @@ internal class OutlineButtonView @JvmOverloads constructor(
     private fun release() {
         isFingerDown = false
         ripple.fadeOut()
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        AccessibilityNodeInfoCompat.wrap(info).className = Button::class.java.name
     }
 
     override fun onDetachedFromWindow() {

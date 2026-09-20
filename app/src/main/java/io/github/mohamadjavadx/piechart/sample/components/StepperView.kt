@@ -53,8 +53,6 @@ internal class StepperView @JvmOverloads constructor(
     private val plusRipple = RippleFade(this)
 
     init {
-        isClickable = true
-        isFocusable = true
         setPadding(16.dp, 0, 16.dp, 0)
     }
 

@@ -7,10 +7,14 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
+import android.widget.Switch
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.DecelerateInterpolator
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.dp
 import io.github.mohamadjavadx.piechart.sample.utils.dpf
@@ -53,6 +57,7 @@ internal class SwitchView @JvmOverloads constructor(
     var labelText: String = ""
         set(value) {
             field = value
+            contentDescription = value
             invalidate()
         }
 
@@ -60,6 +65,7 @@ internal class SwitchView @JvmOverloads constructor(
     var valueText: List<String> = listOf("Off", "On")
         set(value) {
             field = value
+            updateStateDescription()
             invalidate()
         }
 
@@ -124,6 +130,7 @@ internal class SwitchView @JvmOverloads constructor(
     private fun setChecked(value: Boolean, animate: Boolean) {
         if (checked == value) return
         checked = value
+        updateStateDescription()
         animator.cancel()
         val target = if (value) 1f else 0f
         if (animate) {
@@ -139,8 +146,6 @@ internal class SwitchView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> return true // claim the touch
             MotionEvent.ACTION_UP -> {
-                setChecked(!checked, animate = true)
-                checkedChangeListener?.invoke(checked)
                 performClick()
                 return true
             }
@@ -148,14 +153,28 @@ internal class SwitchView @JvmOverloads constructor(
         return super.onTouchEvent(event)
     }
 
+    private fun updateStateDescription() {
+        ViewCompat.setStateDescription(this, valueText.getOrNull(if (checked) 1 else 0))
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        AccessibilityNodeInfoCompat.wrap(info).apply {
+            className = Switch::class.java.name
+            isCheckable = true
+            isChecked = this@SwitchView.checked
+        }
+    }
+
     override fun onDetachedFromWindow() {
         animator.cancel()
         super.onDetachedFromWindow()
     }
 
-    // Keep lint/accessibility happy since we handle clicks manually.
+    /** A tap, the keyboard and a screen reader all end up here, so this is what flips the switch. */
     override fun performClick(): Boolean {
-        super.performClick()
-        return true
+        setChecked(!checked, animate = true)
+        checkedChangeListener?.invoke(checked)
+        return super.performClick()
     }
 }

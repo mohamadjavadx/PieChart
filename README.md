@@ -23,7 +23,7 @@ Tap a slice to select it: the slice gets a soft shadow and its details appear in
 - **Details in the hole.** A pluggable renderer draws information about the selected slice in the middle.
   The default one shows a label, a value and a total, scales its text to the hole and hides itself when
   the hole is too small.
-- **Always square,** and a single small dependency (`androidx.core`).
+- **Always square,** and nothing to pull in beyond `androidx.annotation` and the Kotlin standard library.
 
 ## Install
 

@@ -31,10 +31,10 @@ internal fun ratioOfPx(px: Float, whole: Float): Float =
 
 /**
  * The angle (degrees) at which an arc of [arcPx] pixels lies on a circle of [radius] pixels: what
- * a gap given as a length is worth as an angle. 0 when there is no circle.
+ * a gap given as a length is worth as an angle, at most a full turn. 0 when there is no circle.
  */
 internal fun degreesOfArc(arcPx: Float, radius: Float): Float =
-    if (radius > 0f) (arcPx / radius).toDegrees() else 0f
+    if (radius > 0f) (arcPx / radius).toDegrees().coerceIn(0f, MAX_DEG) else 0f
 
 /**
  * The gap actually used for [sliceCount] slices: 0 for a single slice,

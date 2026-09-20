@@ -67,6 +67,9 @@ public data class CenterInfoStyle(
  * a short value is not shrunk because another slice has a long one, so the text may be a little
  * larger on some slices than on others. Labels are not measured for any of this: they follow
  * the scale but never drop below the minimum, and are ellipsized to fit.
+ *
+ * An instance keeps the layout it worked out for the chart it draws in, so give each chart its own
+ * instance.
  */
 public class DefaultCenterRenderer @JvmOverloads constructor(
     private val style: CenterInfoStyle = CenterInfoStyle(),

@@ -1,5 +1,6 @@
 package io.github.mohamadjavadx.piechart.sample.list
 
+import android.annotation.SuppressLint
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -56,6 +57,8 @@ internal class ListItemsAdapter(
      * Replaces the list, then calls [onCommitted]. With [animate] false the whole list is
      * swapped without item animations, for a different list such as another tab.
      */
+    // A different tab is a different list, so telling the list about each change would only be slower.
+    @SuppressLint("NotifyDataSetChanged")
     fun submitList(
         newItems: List<ListItem>,
         animate: Boolean = true,

@@ -3,25 +3,16 @@ package io.github.mohamadjavadx.piechart.sample.components
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.os.Bundle
 import android.util.AttributeSet
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ViewConfiguration
-import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.SeekBar
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.dp
 import io.github.mohamadjavadx.piechart.sample.utils.dpf
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
- * An [IntControlView] whose value follows a horizontal drag or tap along its track, the left and
- * right arrow keys, and the accessibility actions of a slider.
+ * An [IntControlView] whose value follows a horizontal drag or tap along its track.
  *
  * Only a touch that starts within a band around the track counts. Anywhere else, e.g. on the
  * title, the touch goes on to the list behind the view. Subclasses draw the touch indicator
@@ -47,10 +38,6 @@ internal abstract class DraggableIntControlView(
         style = Paint.Style.FILL
     }
     private val touchIndicatorRadius = 18.dpf
-
-    init {
-        isFocusable = true
-    }
 
     /** The y of the middle of the track, which the touch band is centred on. */
     protected abstract val trackCenterY: Float
@@ -114,48 +101,6 @@ internal abstract class DraggableIntControlView(
         dragging = false
         isFingerDown = false
         touchIndicator.fadeOut()
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val step = when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> -1
-            KeyEvent.KEYCODE_DPAD_RIGHT -> 1
-            else -> return super.onKeyDown(keyCode, event)
-        }
-        commitUserValue(value + step)
-        return true
-    }
-
-    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
-        super.onInitializeAccessibilityNodeInfo(info)
-        AccessibilityNodeInfoCompat.wrap(info).apply {
-            className = SeekBar::class.java.name
-            rangeInfo = RangeInfoCompat.obtain(RangeInfoCompat.RANGE_TYPE_INT, 0f, maxValue.toFloat(), value.toFloat())
-            addAction(AccessibilityActionCompat.ACTION_SET_PROGRESS)
-            if (value < maxValue) addAction(AccessibilityActionCompat.ACTION_SCROLL_FORWARD)
-            if (value > 0) addAction(AccessibilityActionCompat.ACTION_SCROLL_BACKWARD)
-        }
-    }
-
-    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
-        when (action) {
-            AccessibilityActionCompat.ACTION_SET_PROGRESS.id -> {
-                val progress = arguments?.getFloat(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_PROGRESS_VALUE) ?: return false
-                commitUserValue(progress.roundToInt())
-                return true
-            }
-
-            AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD -> {
-                commitUserValue(value + 1)
-                return true
-            }
-
-            AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD -> {
-                commitUserValue(value - 1)
-                return true
-            }
-        }
-        return super.performAccessibilityAction(action, arguments)
     }
 
     override fun onDetachedFromWindow() {

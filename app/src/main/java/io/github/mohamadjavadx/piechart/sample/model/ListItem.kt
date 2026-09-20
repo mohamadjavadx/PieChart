@@ -28,7 +28,10 @@ internal sealed interface Control : ListItem {
  * in. The other unit is dp.
  */
 internal data class UnitChoice(val setting: SizedSetting, val relativeLabel: String, val unit: SizeUnit) {
-    val labels: List<String> get() = listOf(relativeLabel, "dp")
+    val labels: List<String> = listOf(relativeLabel, "dp")
+
+    /** The list item that both units of the setting share; see [ListItem.diffId]. */
+    val rowId: String = "unit_${setting.name}"
 }
 
 internal sealed interface IntControl : Control {
@@ -38,7 +41,7 @@ internal sealed interface IntControl : Control {
     /** Shown as a toggle beside the title; null for a control that has one unit only. */
     val unitChoice: UnitChoice? get() = null
 
-    override val diffId: String get() = unitChoice?.let { "unit_${it.setting.name}" } ?: id
+    override val diffId: String get() = unitChoice?.rowId ?: id
 
     fun withValue(value: Int): IntControl
 
