@@ -87,8 +87,20 @@ internal class UnitToggleView @JvmOverloads constructor(
         get() = selected
         set(value) = moveTo(value, animate = false, notify = false)
 
-    /** Like setting [selectedIndex], but the knob slides when [animate] is true; no notification either way. */
-    fun setSelectedIndex(index: Int, animate: Boolean) = moveTo(index, animate, notify = false)
+    /**
+     * Takes over from [other], the toggle that this one replaces: the knob carries on from where it
+     * is drawn there and slides to the selected unit, so that the swap does not show.
+     */
+    fun continueFrom(other: UnitToggleView) {
+        knobAnimator.cancel()
+        knobPosition = other.knobPosition
+        if (knobPosition == selected.toFloat()) {
+            invalidate()
+        } else {
+            knobAnimator.setFloatValues(knobPosition, selected.toFloat())
+            knobAnimator.start()
+        }
+    }
 
     private var selectionListener: ((Int) -> Unit)? = null
 
@@ -217,8 +229,6 @@ internal class UnitToggleView @JvmOverloads constructor(
                 knobAnimator.setFloatValues(knobPosition, target.toFloat())
                 knobAnimator.start()
             }
-            // Bound again to the unit that a tap is already sliding to: let it finish.
-            !changed && knobAnimator.isRunning -> Unit
             else -> {
                 knobAnimator.cancel()
                 knobPosition = target.toFloat()

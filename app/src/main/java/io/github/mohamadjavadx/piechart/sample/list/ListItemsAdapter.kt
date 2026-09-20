@@ -88,7 +88,7 @@ internal class ListItemsAdapter(
 
     private fun displayedValueAt(position: Int): Any? =
         when (val holder = recyclerView?.findViewHolderForAdapterPosition(position)) {
-            is IntControlHolder -> holder.displayedValue
+            is IntControlVH -> holder.displayedValue
             is SwitchVH -> holder.displayedValue
             else -> null
         }
@@ -154,21 +154,14 @@ internal class ListItemsAdapter(
                 onClick = { position -> withItemAt<Button>(position, onButtonClicked) },
             )
 
-            ItemViewType.Slider -> intControlVH(SliderView(context).apply {
+            // A slider row has room for a unit toggle; it only shows one for a control with two units.
+            ItemViewType.Slider -> intControlVH(UnitSliderRow(context, SliderView(context)).apply {
                 layoutParams = fullWidth()
             })
 
-            ItemViewType.SteppedSlider -> intControlVH(SteppedSliderView(context).apply {
+            ItemViewType.SteppedSlider -> intControlVH(UnitSliderRow(context, SteppedSliderView(context)).apply {
                 layoutParams = fullWidth()
             })
-
-            ItemViewType.UnitRow -> UnitRowVH(
-                UnitSliderRow(context).apply { layoutParams = fullWidth() },
-                onChanged = { position, newValue ->
-                    withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) }
-                },
-                onUnitSelected = { position, unit -> withItemAt<IntControl>(position) { onUnitSelected(it, unit) } },
-            )
 
             ItemViewType.Stepper -> intControlVH(StepperView(context).apply {
                 layoutParams = fullWidth()
@@ -202,7 +195,7 @@ internal class ListItemsAdapter(
         val item = items[position]
         when (holder) {
             is ButtonVH -> holder.bind(item as Button)
-            is IntControlHolder -> holder.bind(item as IntControl)
+            is IntControlVH -> holder.bind(item as IntControl)
             is SwitchVH -> holder.bind(item as Switch)
             is SpacerVH -> holder.bind(item as Spacer)
             is DataSetRowVH -> holder.bind(item as DataSetRow)
@@ -215,7 +208,7 @@ internal class ListItemsAdapter(
         payloads: List<Any>
     ) {
         when (val payload = payloads.lastOrNull() as? ItemPayload) {
-            is ItemPayload.ProgressChanged if holder is IntControlHolder ->
+            is ItemPayload.ProgressChanged if holder is IntControlVH ->
                 holder.setValue(payload.value)
 
             is ItemPayload.Toggled if holder is SwitchVH ->
@@ -228,10 +221,21 @@ internal class ListItemsAdapter(
         }
     }
 
-    private fun intControlVH(view: IntControlView) =
-        IntControlVH(view) { position, newValue ->
-            withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) }
-        }
+    private fun intControlVH(row: UnitSliderRow) = IntControlVH(
+        view = row.slider,
+        unitToggle = row.toggle,
+        root = row,
+        onChanged = { position, newValue -> withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) } },
+        onUnitSelected = { position, unit -> withItemAt<IntControl>(position) { onUnitSelected(it, unit) } },
+    )
+
+    private fun intControlVH(view: IntControlView) = IntControlVH(
+        view = view,
+        unitToggle = null,
+        root = view,
+        onChanged = { position, newValue -> withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) } },
+        onUnitSelected = { _, _ -> },
+    )
 
     // Looked up at event time: the holder's own copy of the item may be a payload update behind.
     private inline fun <reified T : ListItem> withItemAt(position: Int, action: (T) -> Unit) {

@@ -131,9 +131,6 @@ internal enum class ItemViewType {
     Button,
     Slider,
     SteppedSlider,
-
-    /** A slider or a stepped slider with a unit toggle; one row for both units of a setting. */
-    UnitRow,
     Stepper,
     Switch,
     DataSetRow,
@@ -143,8 +140,8 @@ internal enum class ItemViewType {
 internal val ListItem.viewType: ItemViewType
     get() = when (this) {
         is Button -> ItemViewType.Button
-        is Slider -> if (unitChoice != null) ItemViewType.UnitRow else ItemViewType.Slider
-        is SteppedSlider -> if (unitChoice != null) ItemViewType.UnitRow else ItemViewType.SteppedSlider
+        is Slider -> ItemViewType.Slider
+        is SteppedSlider -> ItemViewType.SteppedSlider
         is Stepper -> ItemViewType.Stepper
         is Switch -> ItemViewType.Switch
         is DataSetRow -> ItemViewType.DataSetRow

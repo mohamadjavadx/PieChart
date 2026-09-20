@@ -6,13 +6,14 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mohamadjavadx.piechart.sample.components.DataSetRowView
 import io.github.mohamadjavadx.piechart.sample.components.IntControlView
 import io.github.mohamadjavadx.piechart.sample.components.OutlineButtonView
 import io.github.mohamadjavadx.piechart.sample.components.SwitchView
-import io.github.mohamadjavadx.piechart.sample.components.UnitSliderRow
+import io.github.mohamadjavadx.piechart.sample.components.UnitToggleView
 import io.github.mohamadjavadx.piechart.sample.model.Button
 import io.github.mohamadjavadx.piechart.sample.model.DataSetRow
 import io.github.mohamadjavadx.piechart.sample.model.IntControl
@@ -40,76 +41,71 @@ internal class ButtonVH(
     }
 }
 
-/** What the adapter needs from the holder of an [IntControl]. */
-internal interface IntControlHolder {
-
-    /** What the control shows right now, which may be ahead of the adapter's list while dragging. */
-    val displayedValue: Int
-
-    fun bind(item: IntControl)
-
-    fun setValue(value: Int)
-}
-
-/** Slider, stepped slider and stepper all edit an [IntControl] the same way. */
+/**
+ * Slider, stepped slider and stepper all edit an [IntControl] the same way. A slider row also has
+ * a [unitToggle] when its control comes in two units, and [root] is then the row that holds both.
+ *
+ * Both units of a setting are the same row of the list (see [IntControl.diffId]); the change from
+ * one unit to the other is a swap of holders, which [ListItemAnimator] hands to [takeOver].
+ */
 internal class IntControlVH(
     private val view: IntControlView,
+    private val unitToggle: UnitToggleView?,
+    root: View,
     onChanged: (position: Int, newValue: Int) -> Unit,
-) : RecyclerView.ViewHolder(view), IntControlHolder {
+    onUnitSelected: (position: Int, unit: SizeUnit) -> Unit,
+) : RecyclerView.ViewHolder(root) {
 
     init {
         view.setOnValueChangeListener { onChanged(bindingAdapterPosition, it) }
+        unitToggle?.setOnSelectedListener { onUnitSelected(bindingAdapterPosition, SizeUnit.entries[it]) }
     }
 
-    override fun bind(item: IntControl) {
+    fun bind(item: IntControl) {
+        // A holder that was recycled in the middle of a fade must not stay faded.
+        view.animate().cancel()
+        view.alpha = 1f
+
         view.maxValue = item.maxValue
         view.value = item.value
         view.setLabelFormat(item.label)
+        bindUnitToggle(item)
     }
 
-    override val displayedValue: Int get() = view.value
+    private fun bindUnitToggle(item: IntControl) {
+        val toggle = unitToggle ?: return
+        val choice = item.unitChoice
+        toggle.isVisible = choice != null
+        if (choice == null) return
+        toggle.labels = choice.labels
+        toggle.selectedIndex = choice.unit.ordinal
+        toggle.contentDescription = item.label.substringBefore("%d").trim() + " unit"
+    }
 
-    override fun setValue(value: Int) {
+    /**
+     * This holder replaces [old], which showed the same setting in its other unit. The unit toggle
+     * carries on from where the old one is, so it never seems to go away, and the slider, which is
+     * new, fades in.
+     */
+    fun takeOver(old: IntControlVH) {
+        val toggle = unitToggle
+        val oldToggle = old.unitToggle
+        if (toggle != null && oldToggle != null) toggle.continueFrom(oldToggle)
+
+        view.animate().cancel()
+        view.alpha = 0f
+        view.animate().alpha(1f).setDuration(UNIT_CHANGE_MS).start()
+    }
+
+    /** What the control shows right now, which may be ahead of the adapter's list while dragging. */
+    val displayedValue: Int get() = view.value
+
+    fun setValue(value: Int) {
         view.value = value
     }
-}
 
-/**
- * The row of a setting that is measured in either of two units. Both units are the same row of
- * the list (see [IntControl.diffId]), so a change of unit rebinds this holder: the toggle slides
- * to the new unit and the new slider content fades in. A holder that is bound to another row, or
- * that is not on screen, shows it at once.
- */
-internal class UnitRowVH(
-    private val row: UnitSliderRow,
-    onChanged: (position: Int, newValue: Int) -> Unit,
-    onUnitSelected: (position: Int, unit: SizeUnit) -> Unit,
-) : RecyclerView.ViewHolder(row), IntControlHolder {
-
-    private var boundRow: String? = null
-    private var boundUnit: SizeUnit? = null
-
-    init {
-        row.setOnValueChangeListener { onChanged(bindingAdapterPosition, it) }
-        row.toggle.setOnSelectedListener { onUnitSelected(bindingAdapterPosition, SizeUnit.entries[it]) }
-    }
-
-    override fun bind(item: IntControl) {
-        val choice = requireNotNull(item.unitChoice) { "A unit row needs a unit choice" }
-        val changedUnit = row.isShown && boundRow == item.diffId && boundUnit != choice.unit
-        boundRow = item.diffId
-        boundUnit = choice.unit
-
-        row.show(item, fade = changedUnit)
-        row.toggle.labels = choice.labels
-        row.toggle.setSelectedIndex(choice.unit.ordinal, animate = changedUnit)
-        row.toggle.contentDescription = item.label.substringBefore("%d").trim() + " unit"
-    }
-
-    override val displayedValue: Int get() = row.activeSlider.value
-
-    override fun setValue(value: Int) {
-        row.activeSlider.value = value
+    private companion object {
+        const val UNIT_CHANGE_MS = 150L
     }
 }
 

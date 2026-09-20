@@ -28,13 +28,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.SimpleItemAnimator
 import io.github.mohamadjavadx.piechart.PieChartData
 import io.github.mohamadjavadx.piechart.PieChartView
 import io.github.mohamadjavadx.piechart.center.CenterInfoStyle
 import io.github.mohamadjavadx.piechart.center.CenterVisibility
 import io.github.mohamadjavadx.piechart.center.DefaultCenterRenderer
 import io.github.mohamadjavadx.piechart.sample.components.SegmentedSelectorView
+import io.github.mohamadjavadx.piechart.sample.list.ListItemAnimator
 import io.github.mohamadjavadx.piechart.sample.list.ListItemsAdapter
 import io.github.mohamadjavadx.piechart.sample.model.ChartStyle
 import io.github.mohamadjavadx.piechart.sample.model.dpValue
@@ -173,9 +173,7 @@ class MainActivity : AppCompatActivity() {
         // Switching tabs recycles every row; keep them all instead of destroying the extras.
         recycledViewPool.setMaxRecycledViews(ItemViewType.DataSetRow.ordinal, MAX_RECYCLED_ROWS)
 
-        // Rows are rebound on every keystroke; a change animation would swap the focused
-        // EditText for another view holder and drop focus and cursor.
-        (itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
+        itemAnimator = ListItemAnimator()
 
         addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
