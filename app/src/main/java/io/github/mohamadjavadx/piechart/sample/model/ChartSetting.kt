@@ -54,7 +54,7 @@ internal val DefaultControls: List<Control> = listOf(
     Stepper(
         id = ChartSetting.Segments.id,
         label = "Number of Segments %d",
-        value = 7,
+        value = 5,
         maxValue = 30,
     ),
     Slider(
@@ -80,14 +80,14 @@ internal val DefaultControls: List<Control> = listOf(
     SteppedSlider(
         id = ChartSetting.GapDeg.id,
         label = "Gap %d°",
-        value = 1,
+        value = 2,
         maxValue = 8,
         unitChoice = UnitChoice(SizedSetting.Gap, "deg", SizeUnit.Relative),
     ),
     SteppedSlider(
         id = ChartSetting.GapDp.id,
         label = "Gap %d.dp",
-        value = 2,
+        value = 4,
         maxValue = 16,
         unitChoice = UnitChoice(SizedSetting.Gap, "deg", SizeUnit.Dp),
     ),
