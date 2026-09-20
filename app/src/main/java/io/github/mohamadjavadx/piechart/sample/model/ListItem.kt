@@ -7,6 +7,12 @@ import java.math.BigDecimal
 internal sealed interface ListItem {
     val id: String
 
+    /**
+     * What the list diff takes for the same item. A control that changes into the control of
+     * another unit keeps it, so that the row changes in place instead of leaving and coming back.
+     */
+    val diffId: String get() = id
+
     /** What to update when only part of the item's view changed from [old]; null means all of it. */
     fun changePayloadFrom(old: ListItem): ItemPayload? = null
 }
@@ -16,9 +22,23 @@ internal sealed interface Control : ListItem {
     val label: String
 }
 
+/**
+ * The unit toggle of a control that is measured in either of two units: the [setting] it belongs
+ * to, the label of the relative unit (`%` or `deg`), and which of the two units this control is
+ * in. The other unit is dp.
+ */
+internal data class UnitChoice(val setting: SizedSetting, val relativeLabel: String, val unit: SizeUnit) {
+    val labels: List<String> get() = listOf(relativeLabel, "dp")
+}
+
 internal sealed interface IntControl : Control {
     val value: Int
     val maxValue: Int
+
+    /** Shown as a toggle beside the title; null for a control that has one unit only. */
+    val unitChoice: UnitChoice? get() = null
+
+    override val diffId: String get() = unitChoice?.let { "unit_${it.setting.name}" } ?: id
 
     fun withValue(value: Int): IntControl
 
@@ -51,6 +71,7 @@ internal data class Slider(
     override val label: String,
     override val value: Int,
     override val maxValue: Int,
+    override val unitChoice: UnitChoice? = null,
 ) : IntControl {
     override fun withValue(value: Int) = copy(value = value)
 }
@@ -60,6 +81,7 @@ internal data class SteppedSlider(
     override val label: String,
     override val value: Int,
     override val maxValue: Int,
+    override val unitChoice: UnitChoice? = null,
 ) : IntControl {
     override fun withValue(value: Int) = copy(value = value)
 }
@@ -106,6 +128,9 @@ internal enum class ItemViewType {
     Button,
     Slider,
     SteppedSlider,
+
+    /** A slider or a stepped slider with a unit toggle; one row for both units of a setting. */
+    UnitRow,
     Stepper,
     Switch,
     DataSetRow,
@@ -115,8 +140,8 @@ internal enum class ItemViewType {
 internal val ListItem.viewType: ItemViewType
     get() = when (this) {
         is Button -> ItemViewType.Button
-        is Slider -> ItemViewType.Slider
-        is SteppedSlider -> ItemViewType.SteppedSlider
+        is Slider -> if (unitChoice != null) ItemViewType.UnitRow else ItemViewType.Slider
+        is SteppedSlider -> if (unitChoice != null) ItemViewType.UnitRow else ItemViewType.SteppedSlider
         is Stepper -> ItemViewType.Stepper
         is Switch -> ItemViewType.Switch
         is DataSetRow -> ItemViewType.DataSetRow

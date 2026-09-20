@@ -60,7 +60,7 @@ internal class SliderView @JvmOverloads constructor(
         private set
 
     init {
-        setPadding(16.dp, 0, 16.dp, 8.dp)
+        setPadding(16.dp, SLIDER_TITLE_INSET_DP.dp, 16.dp, 8.dp)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

@@ -12,12 +12,14 @@ import io.github.mohamadjavadx.piechart.sample.components.IntControlView
 import io.github.mohamadjavadx.piechart.sample.components.OutlineButtonView
 import io.github.mohamadjavadx.piechart.sample.components.SliderView
 import io.github.mohamadjavadx.piechart.sample.components.SteppedSliderView
+import io.github.mohamadjavadx.piechart.sample.components.UnitSliderRow
 import io.github.mohamadjavadx.piechart.sample.components.StepperView
 import io.github.mohamadjavadx.piechart.sample.components.SwitchView
 import io.github.mohamadjavadx.piechart.sample.model.BooleanControl
 import io.github.mohamadjavadx.piechart.sample.model.Button
 import io.github.mohamadjavadx.piechart.sample.model.DataSetRow
 import io.github.mohamadjavadx.piechart.sample.model.IntControl
+import io.github.mohamadjavadx.piechart.sample.model.SizeUnit
 import io.github.mohamadjavadx.piechart.sample.model.ItemPayload
 import io.github.mohamadjavadx.piechart.sample.model.ItemViewType
 import io.github.mohamadjavadx.piechart.sample.model.ListItem
@@ -38,6 +40,7 @@ import java.math.BigDecimal
  */
 internal class ListItemsAdapter(
     private val onIntControlChanged: (control: IntControl, newValue: Int) -> Unit,
+    private val onUnitSelected: (control: IntControl, unit: SizeUnit) -> Unit,
     private val onBooleanControlChanged: (control: BooleanControl, newValue: Boolean) -> Unit,
     private val onButtonClicked: (button: Button) -> Unit,
     private val onRowLabelChanged: (rowId: Int, label: String) -> Unit,
@@ -82,7 +85,7 @@ internal class ListItemsAdapter(
 
     private fun displayedValueAt(position: Int): Any? =
         when (val holder = recyclerView?.findViewHolderForAdapterPosition(position)) {
-            is IntControlVH -> holder.displayedValue
+            is IntControlHolder -> holder.displayedValue
             is SwitchVH -> holder.displayedValue
             else -> null
         }
@@ -156,6 +159,14 @@ internal class ListItemsAdapter(
                 layoutParams = fullWidth()
             })
 
+            ItemViewType.UnitRow -> UnitRowVH(
+                UnitSliderRow(context).apply { layoutParams = fullWidth() },
+                onChanged = { position, newValue ->
+                    withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) }
+                },
+                onUnitSelected = { position, unit -> withItemAt<IntControl>(position) { onUnitSelected(it, unit) } },
+            )
+
             ItemViewType.Stepper -> intControlVH(StepperView(context).apply {
                 layoutParams = fullWidth()
             })
@@ -188,7 +199,7 @@ internal class ListItemsAdapter(
         val item = items[position]
         when (holder) {
             is ButtonVH -> holder.bind(item as Button)
-            is IntControlVH -> holder.bind(item as IntControl)
+            is IntControlHolder -> holder.bind(item as IntControl)
             is SwitchVH -> holder.bind(item as Switch)
             is SpacerVH -> holder.bind(item as Spacer)
             is DataSetRowVH -> holder.bind(item as DataSetRow)
@@ -201,7 +212,7 @@ internal class ListItemsAdapter(
         payloads: List<Any>
     ) {
         when (val payload = payloads.lastOrNull() as? ItemPayload) {
-            is ItemPayload.ProgressChanged if holder is IntControlVH ->
+            is ItemPayload.ProgressChanged if holder is IntControlHolder ->
                 holder.setValue(payload.value)
 
             is ItemPayload.Toggled if holder is SwitchVH ->
@@ -232,7 +243,7 @@ internal class ListItemsAdapter(
         override fun getNewListSize() = new.size
 
         override fun areItemsTheSame(oldPosition: Int, newPosition: Int) =
-            old[oldPosition].id == new[newPosition].id
+            old[oldPosition].diffId == new[newPosition].diffId
 
         override fun areContentsTheSame(oldPosition: Int, newPosition: Int) =
             old[oldPosition] == new[newPosition]

@@ -24,6 +24,7 @@ import io.github.mohamadjavadx.piechart.geometry.computeCornerRadii
 import io.github.mohamadjavadx.piechart.geometry.computeGapDeg
 import io.github.mohamadjavadx.piechart.geometry.computeInnerGapDeg
 import io.github.mohamadjavadx.piechart.geometry.computeTargetSweeps
+import io.github.mohamadjavadx.piechart.geometry.degreesOfArc
 import io.github.mohamadjavadx.piechart.geometry.planMorph
 import io.github.mohamadjavadx.piechart.geometry.ratioOfPx
 import io.github.mohamadjavadx.piechart.geometry.sliceIndexAt
@@ -40,9 +41,8 @@ import java.math.MathContext
  *   shrink to make room, and removed slices shrink to nothing.
  * - Supports a center hole (donut) controlled by [holeRadiusRatio].
  * - Supports rounded slice corners controlled by [cornerRadiusRatio].
- * - The hole, the corners and the selected slice's shadow can also be given in px instead of as
- *   ratios, with the `setStyle` overload that has `holeRadiusPx`, `cornerRadiusPx` and
- *   `selectedShadowOffsetPx`.
+ * - The corner radius, the shadow offset and the gap between slices can each be given in dp
+ *   instead of as a ratio (in degrees for the gap), independently of each other: see [setStyle].
  * - Supports [ensureRenderableSlices] to guarantee slices are large enough to render rounded corners.
  * - Supports [roundInnerCorners] to toggle between rounded or sharp inner corners.
  * - Supports tap selection of slices with a callback; the selected slice gets a soft shadow
@@ -65,136 +65,74 @@ public class PieChartView(context: Context) : View(context) {
     /**
      * Applies all visual style configurations at once.
      * This avoids multiple invalidation cycles when changing several properties.
+     *
+     * The corner radius, the shadow offset and the gap can each be given in one of two units, and
+     * each on its own, so the corners can be in dp while the shadow is a ratio:
+     *  - the corner radius as a ratio ([cornerRadiusRatio]) or in dp ([cornerRadiusDp]);
+     *  - the shadow offset as a ratio ([selectedShadowOffsetRatio]) or in dp ([selectedShadowOffsetDp]);
+     *  - the gap in degrees ([visualGapDeg]) or in dp ([visualGapDp]), measured along the chart's
+     *    outer edge.
+     *
+     * A setting that is not given (null) stays as it is, in the unit it has. Giving both units of
+     * one setting is an error. A size in dp stays that size when the chart is resized; the chart
+     * draws with ratios and degrees, so it works them out from the dp at the chart's size, every
+     * time the chart is laid out, and the ratio and degree properties hold the result. The limits
+     * are those of the ratios.
      */
     @MainThread
     public fun setStyle(
-        visualGapDeg: Float = this.visualGapDeg,
+        visualGapDeg: Float? = null,
+        visualGapDp: Float? = null,
         startAngleDeg: Float = this.startAngleDeg,
         selectedAlpha: Int = this.selectedAlpha,
         unselectedAlpha: Int = this.unselectedAlpha,
         selectedShadowAlpha: Int = this.selectedShadowAlpha,
-        selectedShadowOffsetRatio: Float = this.selectedShadowOffsetRatio,
+        selectedShadowOffsetRatio: Float? = null,
+        selectedShadowOffsetDp: Float? = null,
         holeRadiusRatio: Float = this.holeRadiusRatio,
-        cornerRadiusRatio: Float = this.cornerRadiusRatio,
+        cornerRadiusRatio: Float? = null,
+        cornerRadiusDp: Float? = null,
         ensureRenderableSlices: Boolean = this.ensureRenderableSlices,
         roundInnerCorners: Boolean = this.roundInnerCorners,
         disabledColor: Int = this.disabledColor
     ) {
-        applyStyle(
-            visualGapDeg = visualGapDeg,
-            startAngleDeg = startAngleDeg,
-            selectedAlpha = selectedAlpha,
-            unselectedAlpha = unselectedAlpha,
-            selectedShadowAlpha = selectedShadowAlpha,
-            selectedShadowOffsetRatio = selectedShadowOffsetRatio,
-            holeRadiusRatio = holeRadiusRatio,
-            cornerRadiusRatio = cornerRadiusRatio,
-            ensureRenderableSlices = ensureRenderableSlices,
-            roundInnerCorners = roundInnerCorners,
-            disabledColor = disabledColor,
-            holeRadiusPx = null,
-            cornerRadiusPx = null,
-            selectedShadowOffsetPx = null,
-        )
-    }
+        require(visualGapDeg == null || visualGapDp == null) { "Give the gap in degrees or in dp, not both." }
+        require(selectedShadowOffsetRatio == null || selectedShadowOffsetDp == null) {
+            "Give the shadow offset as a ratio or in dp, not both."
+        }
+        require(cornerRadiusRatio == null || cornerRadiusDp == null) {
+            "Give the corner radius as a ratio or in dp, not both."
+        }
 
-    /**
-     * [setStyle] that also takes exact sizes in px (for dp, multiply by the display density): the
-     * radius of the hole ([holeRadiusPx]), of the slices' rounded corners ([cornerRadiusPx]) and how
-     * far the selected slice's shadow is shifted ([selectedShadowOffsetPx]). A size in px is used
-     * instead of the ratio of the same name; null leaves it to the ratio.
-     *
-     * The chart draws with ratios, so a px size is converted to one for the size the chart has at
-     * that moment (or once it has one, if it is not laid out yet): the hole to a share of the
-     * chart's radius, then the corners to a share of half the ring's thickness with that hole, and
-     * the shadow shift to a share of the hole's radius. The ratio properties then hold the result,
-     * and the ratio is what stays when the chart is resized. The limits are those of the ratios.
-     */
-    @MainThread
-    public fun setStyle(
-        visualGapDeg: Float = this.visualGapDeg,
-        startAngleDeg: Float = this.startAngleDeg,
-        selectedAlpha: Int = this.selectedAlpha,
-        unselectedAlpha: Int = this.unselectedAlpha,
-        selectedShadowAlpha: Int = this.selectedShadowAlpha,
-        selectedShadowOffsetRatio: Float = this.selectedShadowOffsetRatio,
-        holeRadiusRatio: Float = this.holeRadiusRatio,
-        cornerRadiusRatio: Float = this.cornerRadiusRatio,
-        ensureRenderableSlices: Boolean = this.ensureRenderableSlices,
-        roundInnerCorners: Boolean = this.roundInnerCorners,
-        disabledColor: Int = this.disabledColor,
-        holeRadiusPx: Float? = null,
-        cornerRadiusPx: Float? = null,
-        selectedShadowOffsetPx: Float? = null,
-    ) {
-        applyStyle(
-            visualGapDeg = visualGapDeg,
-            startAngleDeg = startAngleDeg,
-            selectedAlpha = selectedAlpha,
-            unselectedAlpha = unselectedAlpha,
-            selectedShadowAlpha = selectedShadowAlpha,
-            selectedShadowOffsetRatio = selectedShadowOffsetRatio,
-            holeRadiusRatio = holeRadiusRatio,
-            cornerRadiusRatio = cornerRadiusRatio,
-            ensureRenderableSlices = ensureRenderableSlices,
-            roundInnerCorners = roundInnerCorners,
-            disabledColor = disabledColor,
-            holeRadiusPx = holeRadiusPx,
-            cornerRadiusPx = cornerRadiusPx,
-            selectedShadowOffsetPx = selectedShadowOffsetPx,
-        )
-    }
+        // A unit that is given replaces the one the setting had.
+        visualGapDeg?.let {
+            this.visualGapDeg = it.coerceAtLeast(0f)
+            this.visualGapDp = null
+        }
+        visualGapDp?.let { this.visualGapDp = it.coerceAtLeast(0f) }
+        selectedShadowOffsetRatio?.let {
+            this.selectedShadowOffsetRatio = it.coerceIn(0f, 1f)
+            this.selectedShadowOffsetDp = null
+        }
+        selectedShadowOffsetDp?.let { this.selectedShadowOffsetDp = it.coerceAtLeast(0f) }
+        cornerRadiusRatio?.let {
+            this.cornerRadiusRatio = it.coerceIn(0f, 1f)
+            this.cornerRadiusDp = null
+        }
+        cornerRadiusDp?.let { this.cornerRadiusDp = it.coerceAtLeast(0f) }
 
-    // A size in px waits here until the chart has a size to turn it into a ratio; see calculateBounds.
-    private var pendingHoleRadiusPx: Float? = null
-    private var pendingCornerRadiusPx: Float? = null
-    private var pendingSelectedShadowOffsetPx: Float? = null
-
-    private fun applyStyle(
-        visualGapDeg: Float,
-        startAngleDeg: Float,
-        selectedAlpha: Int,
-        unselectedAlpha: Int,
-        selectedShadowAlpha: Int,
-        selectedShadowOffsetRatio: Float,
-        holeRadiusRatio: Float,
-        cornerRadiusRatio: Float,
-        ensureRenderableSlices: Boolean,
-        roundInnerCorners: Boolean,
-        disabledColor: Int,
-        holeRadiusPx: Float?,
-        cornerRadiusPx: Float?,
-        selectedShadowOffsetPx: Float?,
-    ) {
-        // A ratio that differs from the current one replaces a px size still waiting for the
-        // chart's size. The defaults are the current ratios, so they leave it alone.
-        if (holeRadiusRatio != this.holeRadiusRatio) pendingHoleRadiusPx = null
-        if (cornerRadiusRatio != this.cornerRadiusRatio) pendingCornerRadiusPx = null
-        if (selectedShadowOffsetRatio != this.selectedShadowOffsetRatio) pendingSelectedShadowOffsetPx = null
-
-        this.visualGapDeg = visualGapDeg.coerceAtLeast(0f)
         this.startAngleDeg = startAngleDeg
         this.selectedAlpha = selectedAlpha.coerceIn(0, 255)
         this.unselectedAlpha = unselectedAlpha.coerceIn(0, 255)
         this.selectedShadowAlpha = selectedShadowAlpha.coerceIn(0, 255)
-        this.selectedShadowOffsetRatio = selectedShadowOffsetRatio.coerceIn(0f, 1f)
         this.holeRadiusRatio = holeRadiusRatio.coerceIn(0f, 1f)
-        this.cornerRadiusRatio = cornerRadiusRatio.coerceIn(0f, 1f)
         this.ensureRenderableSlices = ensureRenderableSlices
         this.roundInnerCorners = roundInnerCorners
         this.disabledColor = disabledColor
 
-        // A size in px wins over the ratio of the same name.
-        holeRadiusPx.asPx()?.let { pendingHoleRadiusPx = it }
-        cornerRadiusPx.asPx()?.let { pendingCornerRadiusPx = it }
-        selectedShadowOffsetPx.asPx()?.let { pendingSelectedShadowOffsetPx = it }
-
         calculateBounds(width, height)
         snapToFinalState()
     }
-
-    /** A usable size in px: not negative, and null (as good as not given) when it is not a number. */
-    private fun Float?.asPx(): Float? = this?.takeUnless { it.isNaN() }?.coerceAtLeast(0f)
 
     /**
      * Applies all animation configurations at once.
@@ -213,8 +151,15 @@ public class PieChartView(context: Context) : View(context) {
         this.dataChangeAnimationInterpolator = dataChangeAnimationInterpolator
     }
 
-    /** Angular gap (in degrees) between adjacent slices. */
+    /**
+     * Angular gap (in degrees) between adjacent slices. When the gap was given in dp, this is what
+     * that size is worth on the chart's outer edge, at the chart's current size.
+     */
     public var visualGapDeg: Float = DEFAULT_VISUAL_GAP_DEG
+        private set
+
+    /** The gap in dp when it was given in dp, and null when it was given in degrees. */
+    public var visualGapDp: Float? = null
         private set
 
     /** Start angle (in degrees) for the first slice. -90 means 12 o'clock. */
@@ -240,24 +185,29 @@ public class PieChartView(context: Context) : View(context) {
     /**
      * How far the shadow is shifted toward the hole, as a ratio of the hole's radius. That is also
      * how thick the visible part of it is. It never exceeds half the donut's thickness, so on a thin
-     * donut a larger ratio makes no difference. When it was given in px, this is what
-     * that size was worth at the chart's size at that moment.
+     * donut a larger ratio makes no difference. When it was given in dp, this is what that size is
+     * worth at the chart's current size.
      */
     public var selectedShadowOffsetRatio: Float = DEFAULT_SELECTED_SHADOW_OFFSET_RATIO
         private set
 
-    /**
-     * Size of the center hole as a ratio of the chart radius. When the hole was given in px, this
-     * is what that size was worth at the chart's size at that moment.
-     */
+    /** The shadow offset in dp when it was given in dp, and null when it was given as a ratio. */
+    public var selectedShadowOffsetDp: Float? = null
+        private set
+
+    /** Size of the center hole as a ratio of the chart radius. */
     public var holeRadiusRatio: Float = DEFAULT_HOLE_RADIUS_RATIO
         private set
 
     /**
      * Radius of slice rounded corners, as a ratio of half the donut's thickness. When they were
-     * given in px, this is what that size was worth at the chart's size at that moment.
+     * given in dp, this is what that size is worth at the chart's current size.
      */
     public var cornerRadiusRatio: Float = DEFAULT_CORNER_RADIUS_RATIO
+        private set
+
+    /** The corner radius in dp when it was given in dp, and null when it was given as a ratio. */
+    public var cornerRadiusDp: Float? = null
         private set
 
     /** If true, the chart applies a minimum visible sweep angle internally. */
@@ -592,7 +542,6 @@ public class PieChartView(context: Context) : View(context) {
             CenterVisibility.Never -> false
             CenterVisibility.WhenFits -> renderer.fits(centerArea, allSlices)
             is CenterVisibility.MinHoleRatio -> holeRadiusRatio >= visibility.ratio
-            is CenterVisibility.MinHoleRadiusPx -> centerArea.radius >= visibility.px
         }
     }
 
@@ -851,23 +800,16 @@ public class PieChartView(context: Context) : View(context) {
         cy = padTop + availableHeight / 2f
 
         outerRadius = minOf(availableWidth, availableHeight) / 2f
-        // A size given in px becomes its ratio here, at the chart's size now, and from then on the
-        // ratio is what is drawn. Each is a share of what it is measured against: the hole of the
-        // chart's radius, then the corners of half the thickness and the shadow of the hole's radius.
-        pendingHoleRadiusPx?.let {
-            holeRadiusRatio = ratioOfPx(it, outerRadius)
-            pendingHoleRadiusPx = null
-        }
         innerRadius = outerRadius * holeRadiusRatio
         val thickness = (outerRadius - innerRadius).coerceAtLeast(0f)
-        pendingCornerRadiusPx?.let {
-            cornerRadiusRatio = ratioOfPx(it, thickness / 2f)
-            pendingCornerRadiusPx = null
-        }
-        pendingSelectedShadowOffsetPx?.let {
-            selectedShadowOffsetRatio = ratioOfPx(it, innerRadius)
-            pendingSelectedShadowOffsetPx = null
-        }
+
+        // A size given in dp becomes its ratio (or degrees) here, for the chart's size now, and
+        // the chart draws with that: the corners are a share of half the thickness, the shadow
+        // offset a share of the hole's radius, and the gap an angle on the outer edge.
+        val density = resources.displayMetrics.density
+        cornerRadiusDp?.let { cornerRadiusRatio = ratioOfPx(it * density, thickness / 2f) }
+        selectedShadowOffsetDp?.let { selectedShadowOffsetRatio = ratioOfPx(it * density, innerRadius) }
+        visualGapDp?.let { visualGapDeg = degreesOfArc(it * density, outerRadius) }
 
         sliceRing.setRing(cx, cy, outerRadius, innerRadius)
         // The shadow is the slice again, shifted toward the hole by a share of the hole's radius.

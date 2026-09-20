@@ -13,7 +13,4 @@ public sealed interface CenterVisibility {
 
     /** Only while the hole is at least [ratio] of the chart radius, regardless of the chart's size. */
     public data class MinHoleRatio(val ratio: Float) : CenterVisibility
-
-    /** Only while the hole's radius is at least [px] pixels, regardless of the chart's size. */
-    public data class MinHoleRadiusPx(val px: Float) : CenterVisibility
 }

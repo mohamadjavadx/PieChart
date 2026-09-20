@@ -43,7 +43,7 @@ internal class SteppedSliderView @JvmOverloads constructor(
     private val activeRect = RectF()
 
     init {
-        setPadding(16.dp, 0, 16.dp, 29.dp)
+        setPadding(16.dp, SLIDER_TITLE_INSET_DP.dp, 16.dp, 29.dp)
     }
 
     /** Distance between two neighbouring dots. */

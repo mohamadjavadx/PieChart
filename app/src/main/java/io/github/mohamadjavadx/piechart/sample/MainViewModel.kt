@@ -10,9 +10,12 @@ import io.github.mohamadjavadx.piechart.sample.model.ChartSetting
 import io.github.mohamadjavadx.piechart.sample.model.ChartStyle
 import io.github.mohamadjavadx.piechart.sample.model.Control
 import io.github.mohamadjavadx.piechart.sample.model.DefaultControls
+import io.github.mohamadjavadx.piechart.sample.model.DefaultDpSettings
 import io.github.mohamadjavadx.piechart.sample.model.IntControl
 import io.github.mohamadjavadx.piechart.sample.model.ListState
 import io.github.mohamadjavadx.piechart.sample.model.SampleTab
+import io.github.mohamadjavadx.piechart.sample.model.SizeUnit
+import io.github.mohamadjavadx.piechart.sample.model.SizedSetting
 import io.github.mohamadjavadx.piechart.sample.model.maxCornerRadius
 import io.github.mohamadjavadx.piechart.sample.model.rowId
 import io.github.mohamadjavadx.piechart.sample.model.toChartStyle
@@ -23,12 +26,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 internal class MainViewModel : ViewModel() {
 
     private val _controls = MutableStateFlow(DefaultControls)
+
+    /** The settings that are measured in dp; the others are measured relatively (a ratio, or degrees). */
+    private val _dpSettings = MutableStateFlow(DefaultDpSettings)
 
     /** The corner radius the user picked; the slider shows less of it while the hole ratio is small. */
     private var chosenCornerRadius = defaultCornerRadius()
@@ -59,12 +64,14 @@ internal class MainViewModel : ViewModel() {
 
     private val listItemsBuilder = ListItemsBuilder()
 
-    val listItems: Flow<ListState> = combine(_tab, _controls, _dataSet) { tab, controls, dataSet ->
-        ListState(tab, listItemsBuilder.build(tab, controls, dataSet))
+    val listItems: Flow<ListState> = combine(_tab, _controls, _dpSettings, _dataSet) { tab, controls, dpSettings, dataSet ->
+        ListState(tab, listItemsBuilder.build(tab, controls, dpSettings, dataSet))
     }
 
     /** Only emits when an actual style setting changed, not for e.g. the segment count. */
-    val chartStyle: Flow<ChartStyle> = _controls.map { it.toChartStyle() }.distinctUntilChanged()
+    val chartStyle: Flow<ChartStyle> =
+        combine(_controls, _dpSettings) { controls, dpSettings -> controls.toChartStyle(dpSettings) }
+            .distinctUntilChanged()
 
     /** Row whose value field should take focus once it is on screen; see [clearPendingFocus]. */
     var pendingFocusRowId: Int? = null
@@ -96,6 +103,12 @@ internal class MainViewModel : ViewModel() {
     private fun List<Control>.withCornerRadiusFor(holeRatio: Int): List<Control> = map {
         if (it.id != ChartSetting.CornerRadius.id) return@map it
         (it as IntControl).withValue(minOf(chosenCornerRadius, maxCornerRadius(holeRatio)))
+    }
+
+    /** The unit toggle of [control] was set to [unit]; the setting then shows and uses the control of that unit. */
+    fun selectUnit(control: IntControl, unit: SizeUnit) {
+        val setting = ChartSetting.entries.firstOrNull { it.id == control.id }?.sized ?: return
+        _dpSettings.update { if (unit == SizeUnit.Dp) it + setting else it - setting }
     }
 
     fun updateBooleanControl(control: BooleanControl, value: Boolean) {
@@ -203,6 +216,7 @@ internal class MainViewModel : ViewModel() {
     /** Back to the initial state: default controls and the generated data set. */
     private fun restoreSettings() {
         _controls.value = DefaultControls
+        _dpSettings.value = DefaultDpSettings
         chosenCornerRadius = defaultCornerRadius()
         editedValueIds.clear()
         _dataSet.value = resized(emptyList(), defaultSegmentCount())

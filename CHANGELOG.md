@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-- `setStyle` overload with the hole, the corner radius and the shadow offset in px (`holeRadiusPx`, `cornerRadiusPx`,
-  `selectedShadowOffsetPx`). They are converted to ratios at the chart's size, and the ratios are what is drawn.
-  `CenterVisibility.MinHoleRadiusPx` shows the center while the hole is at least that many px. Ratios work as before.
-  A `when` over `CenterVisibility` needs a branch for the new case.
+- `setStyle` takes the corner radius, the shadow offset and the gap in dp too (`cornerRadiusDp`,
+  `selectedShadowOffsetDp`, `visualGapDp`), each on its own, so the corners can be in dp while the shadow is a ratio.
+  The ratio (degrees for the gap) and dp parameters of a setting are nullable, and null keeps the setting as it is.
+  A size in dp stays that size when the chart is resized; `cornerRadiusDp`, `selectedShadowOffsetDp` and
+  `visualGapDp` tell which unit is in charge. The signature of `setStyle` changed, so recompile against it.
 
 ## 1.0.0
 

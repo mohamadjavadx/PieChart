@@ -6,6 +6,8 @@ import io.github.mohamadjavadx.piechart.sample.model.Control
 import io.github.mohamadjavadx.piechart.sample.model.DataSetRow
 import io.github.mohamadjavadx.piechart.sample.model.ListItem
 import io.github.mohamadjavadx.piechart.sample.model.SampleTab
+import io.github.mohamadjavadx.piechart.sample.model.SizeUnit
+import io.github.mohamadjavadx.piechart.sample.model.SizedSetting
 import io.github.mohamadjavadx.piechart.sample.model.Spacer
 import io.github.mohamadjavadx.piechart.sample.model.rowId
 
@@ -20,19 +22,25 @@ private const val SMALL_SPACE_DP = 16
  */
 internal class ListItemsBuilder {
 
+    private val settingsById = ChartSetting.entries.associateBy { it.id }
     private val spacers = HashMap<String, Spacer>()
     private var rows = HashMap<Int, DataSetRow>()
 
     fun build(
         tab: SampleTab,
         controls: List<Control>,
+        dpSettings: Set<SizedSetting>,
         dataSet: List<PieChartData>,
     ): List<ListItem> = when (tab) {
         SampleTab.ChartSettings -> buildList {
             add(spacer("spacer_top", SMALL_SPACE_DP))
             for (control in controls) {
+                // A setting that is measured in either unit shows the control of its unit only.
+                val setting = settingsById[control.id]
+                val pickedUnit = if (setting?.sized in dpSettings) SizeUnit.Dp else SizeUnit.Relative
+                if (setting?.unit != null && setting.unit != pickedUnit) continue
                 add(control)
-                add(spacer("spacer_after_${control.id}", DEFAULT_SPACE_DP))
+                add(spacer("spacer_after_${control.diffId}", DEFAULT_SPACE_DP))
             }
         }
 

@@ -37,6 +37,8 @@ import io.github.mohamadjavadx.piechart.center.DefaultCenterRenderer
 import io.github.mohamadjavadx.piechart.sample.components.SegmentedSelectorView
 import io.github.mohamadjavadx.piechart.sample.list.ListItemsAdapter
 import io.github.mohamadjavadx.piechart.sample.model.ChartStyle
+import io.github.mohamadjavadx.piechart.sample.model.dpValue
+import io.github.mohamadjavadx.piechart.sample.model.relativeValue
 import io.github.mohamadjavadx.piechart.sample.model.ItemViewType
 import io.github.mohamadjavadx.piechart.sample.model.ListState
 import io.github.mohamadjavadx.piechart.sample.model.SampleTab
@@ -52,6 +54,7 @@ class MainActivity : AppCompatActivity() {
 
     private val listAdapter = ListItemsAdapter(
         onIntControlChanged = { control, newValue -> viewModel.updateIntControl(control, newValue) },
+        onUnitSelected = { control, unit -> viewModel.selectUnit(control, unit) },
         onBooleanControlChanged = { control, newValue -> viewModel.updateBooleanControl(control, newValue) },
         onButtonClicked = { viewModel.onButtonClicked(it) },
         onRowLabelChanged = { rowId, label -> viewModel.updateRowLabel(rowId, label) },
@@ -265,11 +268,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyChartStyle(style: ChartStyle) {
+        // Each size goes to the chart in its own unit; the chart takes either one of a pair.
         chartView.setStyle(
             holeRadiusRatio = style.holeRadiusRatio,
-            cornerRadiusRatio = style.cornerRadiusRatio,
-            visualGapDeg = style.visualGapDeg,
-            selectedShadowOffsetRatio = style.selectedShadowOffsetRatio,
+            cornerRadiusRatio = style.cornerRadius.relativeValue,
+            cornerRadiusDp = style.cornerRadius.dpValue,
+            selectedShadowOffsetRatio = style.shadowOffset.relativeValue,
+            selectedShadowOffsetDp = style.shadowOffset.dpValue,
+            visualGapDeg = style.gap.relativeValue,
+            visualGapDp = style.gap.dpValue,
             ensureRenderableSlices = style.ensureRenderableSlices,
             unselectedAlpha = if (style.dimsOtherSlices) defaultUnselectedAlpha else OPAQUE_ALPHA,
         )
