@@ -153,21 +153,19 @@ class MainActivity : AppCompatActivity() {
         chartView = PieChartView(context).apply {
             setPadding(16.dp)
             defaultUnselectedAlpha = unselectedAlpha
-            // Slices that are too small to see are grouped into one; a tap on it expands it into a ring
-            // of its own, next to one slice in the primary color for all the others.
-            setStyle(
-                groupSmallSlices = true,
-                otherSliceColor = Colors.colorTextVariant,
-                mainSliceColor = Colors.colorAccent,
-            )
+            // With small slices grouped, a tap on the group expands it into a ring of its own, next to
+            // the big slices squeezed into an arc, dimmed. That is the chart's own look; only the color
+            // of the group is the app's.
+            setStyle(otherSliceColor = Colors.colorTextVariant)
             setOnGroupExpandedChangedListener(::onGroupExpandedChanged)
             centerVisibility = CenterVisibility.MinHoleRatio(0.5f)
             // The selected slice's label and value in the hole, shown while the hole is big enough.
             centerRenderer = DefaultCenterRenderer(
                 CenterInfoStyle(labelColor = Colors.colorTextVariant, valueColor = Colors.colorText)
             )
-            // Only a tap on a slice is remembered: the chart also reports "nothing selected" when
-            // its data changes, and that must not forget the choice.
+            // Only a tap is remembered: the chart also reports "nothing selected" when its data
+            // changes, and that must not forget the choice. A tap on the group or on the arc of big
+            // slices selects a slice, and comes here with it.
             setOnChunkClickListener { slice -> viewModel.selectRow(slice.rowId) }
         }
         // Measured once: the screen is portrait only, and a size change recreates the activity.
@@ -207,7 +205,8 @@ class MainActivity : AppCompatActivity() {
     private fun onGroupExpandedChanged(isExpanded: Boolean) {
         backChip.visibility = if (isExpanded) View.VISIBLE else View.INVISIBLE
         backCallback.isEnabled = isExpanded
-        // The slices that were on the ring are gone, or back: select the tapped row again if it is there.
+        // The chart selects a slice when the group is opened or closed. When it goes away by itself
+        // (the switch, new data) it does not: select the tapped row again if it is there.
         chartView.post { restoreSelection() }
     }
 
@@ -323,7 +322,8 @@ class MainActivity : AppCompatActivity() {
      * The chart keeps a selected slice across data changes, but a row that had dropped out (its
      * value was 0, or it is inside the group) is gone from the chart; select it again when it comes
      * back. The chart's own slices are what to look in: it drops rows without a value and groups
-     * small ones, and the slices it adds for that have ids that are not row ids.
+     * small ones, and the slice it adds for that has an id that is not a row id. A row that is in
+     * the expanded group's arc of big slices is found too, but the chart does not select it.
      */
     private fun restoreSelection() {
         val selectedRowId = viewModel.selectedRowId.value ?: return
@@ -341,7 +341,7 @@ class MainActivity : AppCompatActivity() {
             selectedShadowOffsetDp = style.shadowOffset.dpValue,
             visualGapDeg = style.gap.relativeValue,
             visualGapDp = style.gap.dpValue,
-            ensureRenderableSlices = style.ensureRenderableSlices,
+            groupSmallSlices = style.groupSmallSlices,
             unselectedAlpha = if (style.dimsOtherSlices) defaultUnselectedAlpha else OPAQUE_ALPHA,
         )
     }

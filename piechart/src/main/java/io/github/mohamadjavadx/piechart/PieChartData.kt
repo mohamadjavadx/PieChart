@@ -25,9 +25,3 @@ public data class PieChartData(
  * that was given to the chart.
  */
 public data object OtherSliceId
-
-/**
- * The id of the slice that stands for all the other slices while the small ones are expanded
- * ([PieChartView.isGroupExpanded]).
- */
-public data object MainSliceId

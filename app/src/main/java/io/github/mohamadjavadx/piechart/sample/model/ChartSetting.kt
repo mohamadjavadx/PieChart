@@ -22,7 +22,7 @@ internal enum class ChartSetting(val sized: SizedSetting? = null, val unit: Size
     GapDp(SizedSetting.Gap, SizeUnit.Dp),
     ShadowOffset(SizedSetting.ShadowOffset, SizeUnit.Relative),
     ShadowOffsetDp(SizedSetting.ShadowOffset, SizeUnit.Dp),
-    EnsureRenderableSlices,
+    GroupSmallSlices,
     DimOtherSlices,
     Restore;
 
@@ -106,9 +106,9 @@ internal val DefaultControls: List<Control> = listOf(
         unitChoice = UnitChoice(SizedSetting.ShadowOffset, "%", SizeUnit.Dp),
     ),
     Switch(
-        id = ChartSetting.EnsureRenderableSlices.id,
-        label = "Ensure Renderable Slices",
-        value = false,
+        id = ChartSetting.GroupSmallSlices.id,
+        label = "Group Small Slices",
+        value = true,
     ),
     Switch(
         id = ChartSetting.DimOtherSlices.id,

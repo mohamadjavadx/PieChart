@@ -66,19 +66,53 @@ internal fun computeInnerGapDeg(
     return gapDeg
 }
 
-/** Final sweep angles (degrees) for [data], whose values add up to [total]. Sums to 360. */
+/**
+ * Final sweep angles (degrees) for [data], whose values add up to [total]. Sums to 360.
+ *
+ * The first [bandCount] slices are a band: together they take exactly [bandSweep] degrees, shared
+ * in proportion to their values, and no minimum is enforced on them, as they are drawn without
+ * gaps. The others share the rest of the ring.
+ */
 internal fun computeTargetSweeps(
     data: List<PieChartData>,
     total: BigDecimal,
     gapDeg: Float,
     ensureRenderableSlices: Boolean,
+    bandCount: Int = 0,
+    bandSweep: Float = 0f,
 ): FloatArray {
     val n = data.size
-    val sweeps = FloatArray(n) { data[it].value.divide(total, MathContext.DECIMAL64).toFloat() * MAX_DEG }
-    if (ensureRenderableSlices && n * (gapDeg + MIN_SWEEP) <= MAX_DEG) {
-        enforceMinSweepAngle(sweeps, gapDeg + MIN_SWEEP)
+    val band = if (bandCount in 1 until n) bandCount else 0
+    val sweeps = FloatArray(n)
+    if (band == 0) {
+        fillSweeps(data, 0, n, total, MAX_DEG, sweeps)
+    } else {
+        val bandTotal = data.subList(0, band).sumOf { it.value }
+        fillSweeps(data, 0, band, bandTotal, bandSweep, sweeps)
+        fillSweeps(data, band, n, total.subtract(bandTotal), MAX_DEG - bandSweep, sweeps)
+    }
+
+    val rest = n - band
+    if (ensureRenderableSlices && rest * (gapDeg + MIN_SWEEP) <= MAX_DEG - (if (band > 0) bandSweep else 0f)) {
+        val tail = sweeps.copyOfRange(band, n)
+        enforceMinSweepAngle(tail, gapDeg + MIN_SWEEP)
+        tail.copyInto(sweeps, band)
     }
     return sweeps
+}
+
+/** The sweeps of `data[from until to]`, which share [degrees] in proportion to their values, written to [out]. */
+private fun fillSweeps(
+    data: List<PieChartData>,
+    from: Int,
+    to: Int,
+    total: BigDecimal,
+    degrees: Float,
+    out: FloatArray,
+) {
+    for (i in from until to) {
+        out[i] = data[i].value.divide(total, MathContext.DECIMAL64).toFloat() * degrees
+    }
 }
 
 /**
@@ -186,6 +220,7 @@ internal fun computeCornerRadii(
  *
  * [segStarts] and [segEnds] are the angular range of each rendered slice, measured from
  * [startAngleDeg]; [renderIndexMap] maps a rendered slice to its dataset index (-1: exiting).
+ * The dataset's first [bandCount] slices are drawn without gaps, so however small they are, they are there.
  */
 internal fun sliceIndexAt(
     x: Float,
@@ -200,6 +235,7 @@ internal fun sliceIndexAt(
     segStarts: FloatArray,
     segEnds: FloatArray,
     renderIndexMap: IntArray,
+    bandCount: Int = 0,
 ): Int {
     val dx = x - cx
     val dy = y - cy
@@ -216,7 +252,8 @@ internal fun sliceIndexAt(
     val rotated = ((angle - startAngleDeg) % MAX_DEG + MAX_DEG) % MAX_DEG
 
     for (i in segStarts.indices) {
-        if (fullSweeps[i] - gapDeg <= 0f) continue   // not drawn, so not there to be tapped
+        val isBand = renderIndexMap[i] in 0 until bandCount
+        if (!isBand && fullSweeps[i] - gapDeg <= 0f) continue   // not drawn, so not there to be tapped
         if (rotated in segStarts[i]..segEnds[i]) {
             return renderIndexMap[i]   // -1 for exiting slices -> not clickable
         }

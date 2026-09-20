@@ -6,7 +6,7 @@ internal data class ChartStyle(
     val cornerRadius: ChartSize,
     val shadowOffset: ChartSize,
     val gap: ChartSize,
-    val ensureRenderableSlices: Boolean,
+    val groupSmallSlices: Boolean,
     val dimsOtherSlices: Boolean,
 )
 
@@ -43,7 +43,7 @@ internal fun List<Control>.toChartStyle(dpSettings: Set<SizedSetting>) = ChartSt
     } else {
         ChartSize.Relative(intValue(ChartSetting.GapDeg).toFloat())
     },
-    ensureRenderableSlices = (control(ChartSetting.EnsureRenderableSlices) as BooleanControl).value,
+    groupSmallSlices = (control(ChartSetting.GroupSmallSlices) as BooleanControl).value,
     dimsOtherSlices = (control(ChartSetting.DimOtherSlices) as BooleanControl).value,
 )
 

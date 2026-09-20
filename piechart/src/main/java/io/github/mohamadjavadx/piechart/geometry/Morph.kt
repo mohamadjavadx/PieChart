@@ -16,7 +16,9 @@ internal fun sliceKey(data: PieChartData): Any = data.id
  * to [renderList]: the target dataset plus "exiting" slices that shrink to nothing.
  *
  * Each rendered slice's sweep moves from [from] to [to], so the pie is always complete, and the
- * gap and the reveal fraction move with the same progress.
+ * gap and the reveal fraction move with the same progress. So does how much a slice belongs to the
+ * band of an expanded group: [bandFrom] to [bandTo], 0 for a slice of its own and 1 for one in the
+ * band, and anything between while a slice changes from one to the other.
  */
 internal class Morph(
     val renderList: List<PieChartData>,
@@ -26,6 +28,8 @@ internal class Morph(
     val from: FloatArray,
     /** Sweep at the end (degrees). */
     val to: FloatArray,
+    val bandFrom: FloatArray,
+    val bandTo: FloatArray,
     /** Reveal fraction carried into the morph, when a reveal was interrupted. */
     private val fractionSeed: Float,
     /** Gap between slices at the start and at the end, so it never jumps. */
@@ -33,9 +37,11 @@ internal class Morph(
     private val toGap: Float,
 ) {
     /** True when the layout does not change (e.g. a color-only change): nothing to animate. */
-    val isVisuallyIdentical: Boolean get() = from.contentEquals(to)
+    val isVisuallyIdentical: Boolean get() = from.contentEquals(to) && bandFrom.contentEquals(bandTo)
 
     fun sweepAt(index: Int, progress: Float): Float = from[index] + (to[index] - from[index]) * progress
+
+    fun bandAt(index: Int, progress: Float): Float = bandFrom[index] + (bandTo[index] - bandFrom[index]) * progress
 
     fun gapAt(progress: Float): Float = fromGap + (toGap - fromGap) * progress
 
@@ -48,6 +54,9 @@ internal class Morph(
  * [newData], whose final sweeps are [targetSweeps]. Both layouts sum to 360°, so the pie is
  * always complete: new slices grow in, changed slices resize, removed slices shrink to zero in
  * place.
+ *
+ * [oldBand] says how much each old rendered slice is in the band now, and the first [newBandCount]
+ * slices of [newData] are in it at the end.
  */
 internal fun planMorph(
     oldRender: List<PieChartData>,
@@ -58,6 +67,8 @@ internal fun planMorph(
     fractionSeed: Float,
     fromGap: Float,
     toGap: Float,
+    oldBand: FloatArray,
+    newBandCount: Int,
 ): Morph {
     // 1. Match old render items to new items by key (linear search to avoid HashMap allocations).
     val matchOldToNew = IntArray(oldRender.size) { -1 }
@@ -86,12 +97,17 @@ internal fun planMorph(
     val indexMap = ArrayList<Int>(newData.size)
     val fromList = ArrayList<Float>(newData.size)
     val toList = ArrayList<Float>(newData.size)
+    val bandFromList = ArrayList<Float>(newData.size)
+    val bandToList = ArrayList<Float>(newData.size)
 
     fun addExiting(oldIndex: Int) {
         render.add(oldRender[oldIndex])
         indexMap.add(-1)
         fromList.add(oldSweeps[oldIndex])
         toList.add(0f)
+        // Shrinks away in the band, or out of it, as it was.
+        bandFromList.add(oldBand[oldIndex])
+        bandToList.add(oldBand[oldIndex])
     }
 
     for (j in newData.indices) {
@@ -105,6 +121,10 @@ internal fun planMorph(
         indexMap.add(j)
         fromList.add(if (matchedOldIndex >= 0) oldSweeps[matchedOldIndex] else 0f)
         toList.add(targetSweeps[j])
+        val bandTo = if (j < newBandCount) 1f else 0f
+        // A new slice grows in where it will be; one that stays goes from what it is now.
+        bandFromList.add(if (matchedOldIndex >= 0) oldBand[matchedOldIndex] else bandTo)
+        bandToList.add(bandTo)
     }
     for (i in oldRender.indices) {
         if (matchOldToNew[i] < 0 && exitBefore[i] == newData.size) {
@@ -117,6 +137,8 @@ internal fun planMorph(
         renderIndexMap = indexMap.toIntArray(),
         from = fromList.toFloatArray(),
         to = toList.toFloatArray(),
+        bandFrom = bandFromList.toFloatArray(),
+        bandTo = bandToList.toFloatArray(),
         fractionSeed = fractionSeed,
         fromGap = fromGap,
         toGap = toGap,

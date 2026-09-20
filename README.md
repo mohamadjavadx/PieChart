@@ -120,13 +120,13 @@ chart.setStyle(
 | `roundInnerCorners` | `true` | Round the corners on the hole side too (only for holes above 25%). |
 | `visualGapDeg` | `1` | Gap between slices, in degrees. |
 | `startAngleDeg` | `-90` | Where the first slice starts (`-90` is 12 o'clock). |
-| `ensureRenderableSlices` | `false` | Give every slice at least the gap plus 1° so tiny ones stay visible. |
+| `ensureRenderableSlices` | `true` | Give every slice at least the gap plus 1° so tiny ones stay visible. |
 | `selectedAlpha` / `unselectedAlpha` | `255` / `102` | Alpha of the selected slice (and of all slices when none is selected) / of the others. |
 | `selectedShadowAlpha` | `51` (20%) | Alpha of the shadow behind the selected slice. |
 | `selectedShadowOffsetRatio` | `0.06` | Shadow shift as a share of the hole radius; never more than half the ring thickness. |
 | `groupSmallSlices` | `false` | Merge the slices that are too small to see into one slice you can tap; see [Small slices](#small-slices). |
 | `otherSliceColor` | gray | Color of the merged slice. |
-| `mainSliceColor` | blue | Color of the slice that stands for all the other slices while the small ones are expanded. |
+| `mainSliceDim` | `0.7` | How much the big slices are dimmed while the small ones are expanded (0..1). |
 | `disabledColor` | light gray | Color of the empty-state ring. |
 
 **Sizes in dp.** The corner radius, the shadow offset and the gap can each be given in dp instead of as a ratio (in
@@ -153,33 +153,40 @@ Animations: `setAnimationConfig(revealAnimationDuration, revealAnimationInterpol
 
 ## Small slices
 
-A slice whose angle is under the gap plus 1° would have less than 1° left once the gap is cut out of it, so it
+A slice whose angle is under the gap plus 2° would have less than 2° left once the gap is cut out of it, so it
 is hardly there, or not at all. With `groupSmallSlices` those slices are merged into one, and the chart stays tidy:
 
 ```kotlin
 chart.setStyle(
     groupSmallSlices = true,
     otherSliceColor = 0xFF8A93A6.toInt(),   // the merged slice
-    mainSliceColor = 0xFF2B73E3.toInt(),    // the slice for all the others, while the small ones are open
+    mainSliceDim = 0.7f,                    // how much the big slices are dimmed while the small ones are open
 )
 ```
 
 - **Overview.** The big slices are drawn as they are, and one slice, in `otherSliceColor`, stands for all the small
-  ones. It is drawn at least 8° wide so that it can be seen and tapped; the big slices give up the difference.
-- **Expanded.** A tap on that slice (or `chart.expandGroup()`) opens it: one slice in `mainSliceColor`, 90° wide, stands
-  for all the big slices, and the small ones share the other 270°, in proportion to their values.
-- **Back.** A tap on the main slice, or `chart.collapseGroup()`, brings everything back. The chart has no button for it,
-  so a screen can offer one, and system Back, as well: `isGroupExpanded` tells when to, and
-  `setOnGroupExpandedChangedListener { expanded -> ... }` tells when it changes.
+  ones. At least 10° of it is seen, whatever the gap (it is given the gap plus 10°), so that it can be seen and tapped; the
+  big slices give up the difference.
+- **Expanded.** A tap on that slice, or `chart.expandGroup()`, opens it and selects the first of the small slices: the
+  big slices are squeezed into an arc 90° wide,
+  drawn in their own colors, dimmed by `mainSliceDim`, side by side without gaps inside one rounded slice, and the small
+  ones share the other 270°, in proportion to their values. Nothing changes color: the dimming is an opacity, so it suits
+  any background. On the way, the big slices shrink into the arc, and back.
+- **Back.** A tap on the arc of big slices, or `chart.collapseGroup()`, brings everything back and selects the first
+  slice. The chart has no button for it, so a screen can offer one, and system Back, as well, that call
+  `collapseGroup()`: `isGroupExpanded` tells when to, and `setOnGroupExpandedChangedListener { expanded -> ... }` tells
+  when it changes. `setOnChunkClickListener` gets the slice that they select, like any other tap.
 - Nothing is grouped unless at least two slices are small and at least one is not. When data changes and the group is
   gone, the chart collapses by itself and tells the listener.
-- The two slices the chart adds have the ids `OtherSliceId` and `MainSliceId` (they are in `currentDataset`, so
-  `setSelectedIndex` and `SelectedSlice.index` count them). They can not be selected, neither by a tap nor by code, and
-  the center of the ring never shows them.
+- The slice the chart adds for the group has the id `OtherSliceId` (it is in `currentDataset`, so `setSelectedIndex` and
+  `SelectedSlice.index` count it). It can not be selected, and neither can the big slices while they are in the arc:
+  not by a tap, not by code, and the center of the ring never shows them. A selected big slice is deselected when the
+  group expands, and expanding and collapsing select a slice again, as described above.
 - A `SelectedSlice` in the overview or expanded view still has the total of *all* the data you gave, and the share of the
   slice in it, so a small slice shows the same numbers either way.
-- The rule follows the gap: with a larger `visualGapDeg` more slices count as small. Small slices that are still under the
-  gap plus 1° when they are expanded (a huge number of tiny ones) are hidden as before.
+- The rule follows the gap: with a larger `visualGapDeg` more slices count as small. In the expanded ring the small
+  slices are raised to the gap plus 1° by `ensureRenderableSlices` (on by default); with it off, those that would be
+  smaller than the gap are not drawn.
 
 ## Details in the hole
 
@@ -252,7 +259,7 @@ flowchart LR
 ```
 
 - **Angles.** A slice's sweep is `value / total × 360°`, computed from exact `BigDecimal`s. The gap between slices is
-  taken out of each sweep. With `ensureRenderableSlices`, slices smaller than the gap plus 1° are raised to that minimum and
+  taken out of each sweep. With `ensureRenderableSlices` (on by default), slices smaller than the gap plus 1° are raised to that minimum and
   the difference is taken proportionally from the larger ones.
 - **Rounded corners.** Each corner is a circle tangent to the ring's edge and to the slice's side. Its radius is limited by
   the ring's thickness, by the angle available at that end of the slice, and by the space the outer and inner corner

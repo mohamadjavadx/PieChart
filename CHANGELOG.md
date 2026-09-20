@@ -2,13 +2,17 @@
 
 ## Unreleased
 
-- Small slices can be grouped: `setStyle(groupSmallSlices = true)` merges the slices that would have less than 1° left
-  after the gap into one slice (`otherSliceColor`, drawn at least 8° wide). A tap on it, or `expandGroup()`, opens it: one
-  slice (`mainSliceColor`) of 90° stands for all the big slices and the small ones share the other 270°. A tap on the main
-  slice, or `collapseGroup()`, goes back. New: `isGroupExpanded`, `expandGroup()`, `collapseGroup()`,
-  `setOnGroupExpandedChangedListener`, `OtherSliceId`, `MainSliceId`. These two slices can not be selected, and a
-  `SelectedSlice` keeps the total and the share of all the data you gave. Off by default. `setStyle` got three more
-  parameters, so recompile against it.
+- Small slices can be grouped: `setStyle(groupSmallSlices = true)` merges the slices that would have less than 2° left
+  after the gap into one slice (`otherSliceColor`, at least 10° of it seen, whatever the gap). A tap on it, or `expandGroup()`, opens it: the
+  big slices are squeezed into a 90° arc, drawn dimmed (`mainSliceDim`, 0.7 by default) inside one rounded slice, and
+  the small ones share the other 270°. A tap on the arc, or `collapseGroup()`, goes back. Expanding selects
+  the first of the small slices, and collapsing selects the first slice, by tap or by calling the functions
+  (`setOnChunkClickListener` gets it). New: `isGroupExpanded`,
+  `expandGroup()`, `collapseGroup()`, `setOnGroupExpandedChangedListener`, `OtherSliceId`. The group's slice and the
+  big slices in the arc can not be selected, and a `SelectedSlice` keeps the total and the share of all the data you
+  gave. Off by default. `setStyle` got three more parameters, so recompile against it.
+- `ensureRenderableSlices` is on by default: a slice is never drawn smaller than the gap plus 1°, and the larger slices
+  give up the difference. Pass `ensureRenderableSlices = false` to draw the sizes as they are.
 - `setStyle` takes the corner radius, the shadow offset and the gap in dp too (`cornerRadiusDp`,
   `selectedShadowOffsetDp`, `visualGapDp`), each on its own, so the corners can be in dp while the shadow is a ratio.
   The ratio (degrees for the gap) and dp parameters of a setting are nullable, and null keeps the setting as it is.
