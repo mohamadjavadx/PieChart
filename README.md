@@ -4,6 +4,12 @@
 
 An animated **pie / donut chart view** for Android (Kotlin, plain `View` — no Compose, no XML).
 Tap a slice to select it: the slice gets a soft shadow and its details appear in the middle of the ring.
+Data changes morph smoothly, and slices that are too small to see fold into one you can tap open.
+
+<p align="center">
+  <img src="docs/images/demo.gif" width="300" alt="A tour of the demo app: the ring reveals itself, slices are selected, the style changes live, data is added and the ring morphs, tiny slices are grouped into Other, and tapping it expands them next to the big slices folded into one dimmed arc">
+</p>
+<p align="center"><sub>The demo app. <a href="docs/demo.mp4">Watch it as a video</a> (sharper, and much smaller).</sub></p>
 
 <p align="center">
   <img src="docs/images/chart-default.png" width="260" alt="Donut chart with the first slice selected: its label and value are shown in the hole">
@@ -164,6 +170,11 @@ chart.setStyle(
 )
 ```
 
+<p align="center">
+  <img src="docs/images/group-overview.png" width="260" alt="Thirty slices: the small ones are merged into one gray Other slice next to the big ones">
+  <img src="docs/images/group-expanded.png" width="260" alt="Other expanded: the big slices are one dimmed arc, the small slices share the rest of the ring, and the first of them is selected">
+</p>
+
 - **Overview.** The big slices are drawn as they are, and one slice, in `otherSliceColor`, stands for all the small
   ones. At least 10° of it is seen, whatever the gap (it is given the gap plus 10°), so that it can be seen and tapped; the
   big slices give up the difference.
@@ -289,13 +300,15 @@ flowchart LR
 
 ## Demo app
 
-The `:app` module is a settings playground for the chart: change the number of segments, hole size, corners, gap and
-shadow, toggle dimming, and edit the data (label and value of every row, with Next moving between values). It groups
-small slices too: tap the merged slice to open it, and go back with the chip above the chart, the main slice or system Back.
+The `:app` module is a settings playground for the chart: change the number of segments (hold + or − to run through
+them), hole size, corners, gap and shadow (each in dp or relative, with a toggle), switch the grouping of small slices
+and the dimming of the others on and off, and edit the data (label and value of every row, with Next moving between
+values). Add rows up to 30 to see the small slices group: tap the merged slice to open it, and go back with the chip
+above the chart, a tap on the dimmed arc, or system Back.
 
 <p align="center">
-  <img src="docs/images/demo-settings.png" width="260" alt="Demo: chart settings">
-  <img src="docs/images/demo-data.png" width="260" alt="Demo: editing the data">
+  <img src="docs/images/demo-settings.png" width="260" alt="Demo: the chart on top, and the settings below it: number of segments, hole ratio, corner radius and gap">
+  <img src="docs/images/demo-data.png" width="260" alt="Demo: the Data tab, one row per slice with its label and value">
 </p>
 
 ## Limitations
