@@ -83,6 +83,10 @@ internal abstract class IntControlView(
         invalidate()
     }
 
+    /** True while a change comes from a button that is held down and repeats, not from a single press. */
+    var isRepeating: Boolean = false
+        protected set
+
     fun setOnValueChangeListener(listener: (Int) -> Unit) {
         valueChangeListener = listener
     }

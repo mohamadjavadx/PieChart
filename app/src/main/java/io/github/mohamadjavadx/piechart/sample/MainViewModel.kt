@@ -87,7 +87,11 @@ internal class MainViewModel : ViewModel() {
         _tab.value = tab
     }
 
-    fun updateIntControl(control: IntControl, value: Int) {
+    /**
+     * [repeated] is a change from a button that is held down: it goes on to the next one, so a
+     * row that is added empty does not take the focus (which would end the hold on another tab).
+     */
+    fun updateIntControl(control: IntControl, value: Int, repeated: Boolean = false) {
         if (control.id == ChartSetting.CornerRadius.id) chosenCornerRadius = value
         // One update, so that the chart gets the new hole ratio and corner radius together.
         _controls.update { controls ->
@@ -95,7 +99,7 @@ internal class MainViewModel : ViewModel() {
             if (control.id == ChartSetting.HoleRatio.id) updated.withCornerRadiusFor(holeRatio = value) else updated
         }
         if (control.id == ChartSetting.Segments.id) {
-            resizeDataSet(value, NewRowFocus.IfValueEmpty)
+            resizeDataSet(value, if (repeated) NewRowFocus.None else NewRowFocus.IfValueEmpty)
         }
     }
 

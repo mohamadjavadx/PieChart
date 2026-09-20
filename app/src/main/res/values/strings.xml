@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">PieChart</string>
     <string name="chart_title">Pie Chart</string>
+    <string name="chart_back">Back to all slices</string>
     <string name="tab_chart_settings">Chart Setting</string>
     <string name="tab_data">Data</string>
     <string name="tab_selector_description">Sections</string>

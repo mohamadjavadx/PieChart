@@ -7,8 +7,8 @@ public data class SelectedSlice(
     /** Index in [PieChartView.currentDataset]. */
     val index: Int,
     val data: PieChartData,
-    /** Sum of all slice values, exact. */
+    /** Sum of all the slice values given to the chart, exact; also while small slices are grouped. */
     val total: BigDecimal,
-    /** Share of the whole, 0..1; only meant for drawing and rounding. */
+    /** Share of all the data given to the chart, 0..1; only meant for drawing and rounding. */
     val fraction: Float,
 )

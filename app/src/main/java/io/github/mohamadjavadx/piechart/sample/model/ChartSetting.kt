@@ -54,8 +54,8 @@ internal val DefaultControls: List<Control> = listOf(
     Stepper(
         id = ChartSetting.Segments.id,
         label = "Number of Segments %d",
-        value = 5,
-        maxValue = 100,
+        value = 7,
+        maxValue = 30,
     ),
     Slider(
         id = ChartSetting.HoleRatio.id,

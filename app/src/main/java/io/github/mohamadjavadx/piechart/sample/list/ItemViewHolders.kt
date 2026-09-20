@@ -52,12 +52,12 @@ internal class IntControlVH(
     private val view: IntControlView,
     private val unitToggle: UnitToggleView?,
     root: View,
-    onChanged: (position: Int, newValue: Int) -> Unit,
+    onChanged: (position: Int, newValue: Int, repeated: Boolean) -> Unit,
     onUnitSelected: (position: Int, unit: SizeUnit) -> Unit,
 ) : RecyclerView.ViewHolder(root) {
 
     init {
-        view.setOnValueChangeListener { onChanged(bindingAdapterPosition, it) }
+        view.setOnValueChangeListener { onChanged(bindingAdapterPosition, it, view.isRepeating) }
         unitToggle?.setOnSelectedListener { onUnitSelected(bindingAdapterPosition, SizeUnit.entries[it]) }
     }
 

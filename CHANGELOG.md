@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Small slices can be grouped: `setStyle(groupSmallSlices = true)` merges the slices that would have less than 1° left
+  after the gap into one slice (`otherSliceColor`, drawn at least 8° wide). A tap on it, or `expandGroup()`, opens it: one
+  slice (`mainSliceColor`) of 90° stands for all the big slices and the small ones share the other 270°. A tap on the main
+  slice, or `collapseGroup()`, goes back. New: `isGroupExpanded`, `expandGroup()`, `collapseGroup()`,
+  `setOnGroupExpandedChangedListener`, `OtherSliceId`, `MainSliceId`. These two slices can not be selected, and a
+  `SelectedSlice` keeps the total and the share of all the data you gave. Off by default. `setStyle` got three more
+  parameters, so recompile against it.
 - `setStyle` takes the corner radius, the shadow offset and the gap in dp too (`cornerRadiusDp`,
   `selectedShadowOffsetDp`, `visualGapDp`), each on its own, so the corners can be in dp while the shadow is a ratio.
   The ratio (degrees for the gap) and dp parameters of a setting are nullable, and null keeps the setting as it is.

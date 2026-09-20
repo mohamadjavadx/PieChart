@@ -20,6 +20,8 @@ Tap a slice to select it: the slice gets a soft shadow and its details appear in
   new ones grow in, removed ones shrink away where they were.
 - **Tap selection** with a shadow behind the selected slice and optional dimming of the others.
   The selection follows its slice when the data changes.
+- **Small slices grouped.** Slices too small to be seen can be merged into one "Other" slice; a tap on it opens them
+  up on a ring of their own.
 - **Details in the hole.** A pluggable renderer draws information about the selected slice in the middle.
   The default one shows a label, a value and a total, scales its text to the hole and hides itself when
   the hole is too small.
@@ -87,7 +89,8 @@ chart.setOnSelectionChangedListener { slice ->     // SelectedSlice? — null wh
 
 - **Tap** a slice, or call `setSelectedIndex(index)` (`-1` clears it). If an animation is running, the request is
   applied when it ends.
-- `currentSelection` gives the selected `SelectedSlice` (`index`, `data`, exact `total`, `fraction`).
+- `currentSelection` gives the selected `SelectedSlice` (`index`, `data`, exact `total`, `fraction`). `index` is a place in
+  `currentDataset`, which holds the merged slice while small slices are grouped.
 - `setOnSelectionChangedListener` is called when the selection moves to another slice or to nothing.
   It is **not** called when new data keeps the same slice selected, even if the slice moved or its value changed.
 - **The selection survives `setData`** as long as a slice with the same `id` is still in the data.
@@ -121,6 +124,9 @@ chart.setStyle(
 | `selectedAlpha` / `unselectedAlpha` | `255` / `102` | Alpha of the selected slice (and of all slices when none is selected) / of the others. |
 | `selectedShadowAlpha` | `51` (20%) | Alpha of the shadow behind the selected slice. |
 | `selectedShadowOffsetRatio` | `0.06` | Shadow shift as a share of the hole radius; never more than half the ring thickness. |
+| `groupSmallSlices` | `false` | Merge the slices that are too small to see into one slice you can tap; see [Small slices](#small-slices). |
+| `otherSliceColor` | gray | Color of the merged slice. |
+| `mainSliceColor` | blue | Color of the slice that stands for all the other slices while the small ones are expanded. |
 | `disabledColor` | light gray | Color of the empty-state ring. |
 
 **Sizes in dp.** The corner radius, the shadow offset and the gap can each be given in dp instead of as a ratio (in
@@ -144,6 +150,36 @@ Animations: `setAnimationConfig(revealAnimationDuration, revealAnimationInterpol
 (defaults: 600 ms each). Padding works as on any view and the chart is drawn in the largest circle inside it.
 
 > Note: `setStyle` and padding changes end any running animation and jump to the final layout.
+
+## Small slices
+
+A slice whose angle is under the gap plus 1° would have less than 1° left once the gap is cut out of it, so it
+is hardly there, or not at all. With `groupSmallSlices` those slices are merged into one, and the chart stays tidy:
+
+```kotlin
+chart.setStyle(
+    groupSmallSlices = true,
+    otherSliceColor = 0xFF8A93A6.toInt(),   // the merged slice
+    mainSliceColor = 0xFF2B73E3.toInt(),    // the slice for all the others, while the small ones are open
+)
+```
+
+- **Overview.** The big slices are drawn as they are, and one slice, in `otherSliceColor`, stands for all the small
+  ones. It is drawn at least 8° wide so that it can be seen and tapped; the big slices give up the difference.
+- **Expanded.** A tap on that slice (or `chart.expandGroup()`) opens it: one slice in `mainSliceColor`, 90° wide, stands
+  for all the big slices, and the small ones share the other 270°, in proportion to their values.
+- **Back.** A tap on the main slice, or `chart.collapseGroup()`, brings everything back. The chart has no button for it,
+  so a screen can offer one, and system Back, as well: `isGroupExpanded` tells when to, and
+  `setOnGroupExpandedChangedListener { expanded -> ... }` tells when it changes.
+- Nothing is grouped unless at least two slices are small and at least one is not. When data changes and the group is
+  gone, the chart collapses by itself and tells the listener.
+- The two slices the chart adds have the ids `OtherSliceId` and `MainSliceId` (they are in `currentDataset`, so
+  `setSelectedIndex` and `SelectedSlice.index` count them). They can not be selected, neither by a tap nor by code, and
+  the center of the ring never shows them.
+- A `SelectedSlice` in the overview or expanded view still has the total of *all* the data you gave, and the share of the
+  slice in it, so a small slice shows the same numbers either way.
+- The rule follows the gap: with a larger `visualGapDeg` more slices count as small. Small slices that are still under the
+  gap plus 1° when they are expanded (a huge number of tiny ones) are hidden as before.
 
 ## Details in the hole
 
@@ -239,6 +275,7 @@ flowchart LR
 |---|---|
 | `PieChartView.kt` | The view: state, animation, drawing, touch. |
 | `geometry/SliceMath.kt` | Pure math: gap, sweeps, corner radii, hit test. |
+| `geometry/Grouping.kt` | Pure logic: which slices are small, and what the overview and the expanded view show. |
 | `geometry/Morph.kt` | Plans and describes one data-change animation. |
 | `geometry/RingPathBuilder.kt` | Builds the outline of a slice on any ring. |
 | `center/` | `CenterRenderer`, `DefaultCenterRenderer`, visibility rules and the fade presenter. |
@@ -246,7 +283,8 @@ flowchart LR
 ## Demo app
 
 The `:app` module is a settings playground for the chart: change the number of segments, hole size, corners, gap and
-shadow, toggle dimming, and edit the data (label and value of every row, with Next moving between values).
+shadow, toggle dimming, and edit the data (label and value of every row, with Next moving between values). It groups
+small slices too: tap the merged slice to open it, and go back with the chip above the chart, the main slice or system Back.
 
 <p align="center">
   <img src="docs/images/demo-settings.png" width="260" alt="Demo: chart settings">

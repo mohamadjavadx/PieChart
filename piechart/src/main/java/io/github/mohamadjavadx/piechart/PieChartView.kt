@@ -19,8 +19,10 @@ import io.github.mohamadjavadx.piechart.center.CenterPresenter
 import io.github.mohamadjavadx.piechart.center.CenterRenderer
 import io.github.mohamadjavadx.piechart.center.CenterVisibility
 import io.github.mohamadjavadx.piechart.geometry.MAX_DEG
+import io.github.mohamadjavadx.piechart.geometry.Grouping
 import io.github.mohamadjavadx.piechart.geometry.Morph
 import io.github.mohamadjavadx.piechart.geometry.RingPathBuilder
+import io.github.mohamadjavadx.piechart.geometry.groupSlices
 import io.github.mohamadjavadx.piechart.geometry.computeCornerRadii
 import io.github.mohamadjavadx.piechart.geometry.computeGapDeg
 import io.github.mohamadjavadx.piechart.geometry.computeInnerGapDeg
@@ -44,6 +46,8 @@ import java.math.MathContext
  * - Supports rounded slice corners controlled by [cornerRadiusRatio].
  * - The corner radius, the shadow offset and the gap between slices can each be given in dp
  *   instead of as a ratio (in degrees for the gap), independently of each other: see [setStyle].
+ * - Can group the slices that would be too small to see into one, and expand that group into a
+ *   ring of its own when it is tapped: see [groupSmallSlices].
  * - Supports [ensureRenderableSlices] to guarantee slices are large enough to render rounded corners.
  * - Supports [roundInnerCorners] to toggle between rounded or sharp inner corners.
  * - Supports tap selection of slices with a callback; the selected slice gets a soft shadow:
@@ -80,6 +84,9 @@ public class PieChartView(context: Context) : View(context) {
      * draws with ratios and degrees, so it works them out from the dp at the chart's size, every
      * time the chart is laid out, and the ratio and degree properties hold the result. The limits
      * are those of the ratios.
+     *
+     * [groupSmallSlices] turns on the grouping of small slices, and [otherSliceColor] and
+     * [mainSliceColor] are the colors of the two slices that the chart adds for it.
      */
     @MainThread
     public fun setStyle(
@@ -96,7 +103,10 @@ public class PieChartView(context: Context) : View(context) {
         cornerRadiusDp: Float? = null,
         ensureRenderableSlices: Boolean = this.ensureRenderableSlices,
         roundInnerCorners: Boolean = this.roundInnerCorners,
-        disabledColor: Int = this.disabledColor
+        disabledColor: Int = this.disabledColor,
+        groupSmallSlices: Boolean = this.groupSmallSlices,
+        otherSliceColor: Int = this.otherSliceColor,
+        mainSliceColor: Int = this.mainSliceColor,
     ) {
         require(visualGapDeg == null || visualGapDp == null) { "Give the gap in degrees or in dp, not both." }
         require(selectedShadowOffsetRatio == null || selectedShadowOffsetDp == null) {
@@ -131,8 +141,17 @@ public class PieChartView(context: Context) : View(context) {
         this.ensureRenderableSlices = ensureRenderableSlices
         this.roundInnerCorners = roundInnerCorners
         this.disabledColor = disabledColor
+        this.groupSmallSlices = groupSmallSlices
+        this.otherSliceColor = otherSliceColor
+        this.mainSliceColor = mainSliceColor
 
+        relayout()
+    }
+
+    /** New bounds, the slices to show for them, and the final layout. */
+    private fun relayout() {
         calculateBounds(width, height)
+        syncGroups()
         snapToFinalState()
     }
 
@@ -223,6 +242,35 @@ public class PieChartView(context: Context) : View(context) {
     public var roundInnerCorners: Boolean = DEFAULT_ROUND_INNER_CORNERS
         private set
 
+    /**
+     * Whether the slices that would be too small to see are grouped into one. A slice is too small
+     * when less than 1° of it would remain once the gap is cut out of it (its angle is under the gap
+     * plus 1°). The group is one slice, in [otherSliceColor], that is drawn at least 8° wide, so it
+     * can be seen and tapped; the big slices give up the difference. A tap on it expands it: see
+     * [isGroupExpanded]. Nothing is grouped unless at least two slices are small and one is not.
+     * [setSelectedIndex] does not select the slice of the group, and neither does a tap.
+     */
+    public var groupSmallSlices: Boolean = DEFAULT_GROUP_SMALL_SLICES
+        private set
+
+    /** Color of the slice that stands for the grouped small slices. */
+    public var otherSliceColor: Int = DEFAULT_OTHER_SLICE_COLOR
+        private set
+
+    /** Color of the slice that stands for all the other slices while the group is expanded. */
+    public var mainSliceColor: Int = DEFAULT_MAIN_SLICE_COLOR
+        private set
+
+    /**
+     * True while the grouped small slices are expanded: the chart then shows one slice, in
+     * [mainSliceColor], for all the other slices, 90° wide, and the small slices share the other
+     * 270°. A tap on the group ([expandGroup]) expands it, a tap on the main slice
+     * ([collapseGroup]) brings the small slices back together. It is false whenever there is no
+     * group, and the change is reported to [setOnGroupExpandedChangedListener].
+     */
+    public var isGroupExpanded: Boolean = false
+        private set
+
     /** Color of the placeholder slice drawn when the chart has no data. */
     public var disabledColor: Int = DEFAULT_DISABLED_COLOR
         private set
@@ -246,7 +294,16 @@ public class PieChartView(context: Context) : View(context) {
     // ------------------------------------------------------------------
     //  Data state
     // ------------------------------------------------------------------
-    /** The target dataset (what the chart shows once animations settle). */
+    /** What [setData] was given, without the slices that have no value. */
+    private var sourceData: List<PieChartData> = emptyList()
+
+    /** The sum of the values of [sourceData]: the whole that every share is a share of. */
+    private var sourceTotal: BigDecimal = BigDecimal.ZERO
+
+    /**
+     * The target dataset (what the chart shows once animations settle): [sourceData], or, with
+     * the small slices grouped, the slices that stand for them.
+     */
     private var dataset: List<PieChartData> = emptyList()
     private var selectedIndexRaw: Int = -1
 
@@ -290,11 +347,15 @@ public class PieChartView(context: Context) : View(context) {
 
     private var onChunkClickListener: ((PieChartData) -> Unit)? = null
     private var onSelectionChangedListener: ((SelectedSlice?) -> Unit)? = null
+    private var onGroupExpandedChangedListener: ((Boolean) -> Unit)? = null
 
     private val center = CenterPresenter(this)
 
     /** One [SelectedSlice] per dataset entry; rebuilt with the data, so the instances are stable. */
     private var allSlices: List<SelectedSlice> = emptyList()
+
+    /** [allSlices] without the two that the chart adds for the group: what a center renderer sees. */
+    private var centerSlices: List<SelectedSlice> = emptyList()
     private var isCenterAvailable = false
 
     // ------------------------------------------------------------------
@@ -323,6 +384,7 @@ public class PieChartView(context: Context) : View(context) {
     // ==================================================================
     //  Public API
     // ==================================================================
+    /** The slices as they are shown: with the small slices grouped, the grouping slices are in it. */
     public val currentDataset: List<PieChartData> get() = dataset
     public val currentSelectedIndex: Int get() = selectedIndex
 
@@ -356,13 +418,81 @@ public class PieChartView(context: Context) : View(context) {
 
     @MainThread
     public fun setData(newDataset: List<PieChartData>) {
-        val clean = newDataset.filter { it.value.signum() > 0 }
+        sourceData = newDataset.filter { it.value.signum() > 0 }
+        sourceTotal = sourceData.sumOf { it.value }
+        showSource(animate = true)
+    }
 
-        if (clean.isEmpty()) {
-            clearData()
-            return
+    /** Removes all data, clears the selection, and shows the disabled placeholder. */
+    @MainThread
+    public fun clearData() {
+        sourceData = emptyList()
+        sourceTotal = BigDecimal.ZERO
+        val wasExpanded = isGroupExpanded
+        isGroupExpanded = false
+        clearDisplayed()
+        if (wasExpanded) onGroupExpandedChangedListener?.invoke(false)
+    }
+
+    /** Expands the grouped small slices, as a tap on the group does; nothing happens without a group. */
+    @MainThread
+    public fun expandGroup() {
+        setGroupExpanded(true)
+    }
+
+    /** Brings the expanded small slices back together, as a tap on the main slice does. */
+    @MainThread
+    public fun collapseGroup() {
+        setGroupExpanded(false)
+    }
+
+    private fun setGroupExpanded(expanded: Boolean) {
+        if (isGroupExpanded == expanded) return
+        if (expanded && !groupingOf(sourceData).hasGroup) return
+        isGroupExpanded = expanded
+        showSource(animate = true)
+        onGroupExpandedChangedListener?.invoke(expanded)
+    }
+
+    /**
+     * Called when the group is expanded or collapsed, by a tap, by [expandGroup] or
+     * [collapseGroup], or because there is no group any more. Null removes the listener.
+     */
+    @MainThread
+    public fun setOnGroupExpandedChangedListener(listener: ((isExpanded: Boolean) -> Unit)?) {
+        onGroupExpandedChangedListener = listener
+    }
+
+    private fun groupingOf(source: List<PieChartData>): Grouping =
+        if (groupSmallSlices) {
+            groupSlices(source, visualGapDeg, isGroupExpanded, otherSliceColor, mainSliceColor)
+        } else {
+            Grouping(source, hasGroup = false)
         }
 
+    /** Shows [sourceData], grouped as it is now; the change is animated when [animate] is true. */
+    private fun showSource(animate: Boolean) {
+        val grouping = groupingOf(sourceData)
+        val groupGone = isGroupExpanded && !grouping.hasGroup
+        if (groupGone) isGroupExpanded = false
+        if (grouping.slices.isEmpty()) clearDisplayed() else showDisplayed(grouping.slices, animate)
+        if (groupGone) onGroupExpandedChangedListener?.invoke(false)
+    }
+
+    /**
+     * The slices to show depend on the gap and on the style, which change without new data: this
+     * follows them, at once.
+     */
+    private fun syncGroups() {
+        if (sourceData.isEmpty()) return
+        val grouping = groupingOf(sourceData)
+        val groupGone = isGroupExpanded && !grouping.hasGroup
+        if (groupGone) isGroupExpanded = false
+        if (grouping.slices != dataset) showDisplayed(grouping.slices, animate = false)
+        if (groupGone) onGroupExpandedChangedListener?.invoke(false)
+    }
+
+    private fun showDisplayed(clean: List<PieChartData>, animate: Boolean) {
         // The selection follows its slice into the new data, matched by the slice's key: it stays
         // when the slice is still there, even at another index, and is cleared when it is not.
         // A selection requested during an animation counts, and so does a request to deselect.
@@ -376,10 +506,13 @@ public class PieChartView(context: Context) : View(context) {
             renderList = clean
             renderIndexMap = IntArray(clean.size) { it }
             precomputeSegments()
-            animateIn()
-        } else {
+            if (animate) animateIn() else animatedFractions.fill(1f)
+        } else if (animate) {
             // Existing data: morph from the current layout to the new one.
             startMorph(clean)
+        } else {
+            dataset = clean
+            snapToFinalState()
         }
 
         rebuildSlices()
@@ -392,9 +525,7 @@ public class PieChartView(context: Context) : View(context) {
         invalidate()
     }
 
-    /** Removes all data, clears the selection, and shows the disabled placeholder. */
-    @MainThread
-    public fun clearData() {
+    private fun clearDisplayed() {
         revealAnimator?.cancel()
         morphAnimator?.let { anim ->
             morphAnimator = null // Prevent finishMorph() from running via the listener
@@ -411,6 +542,8 @@ public class PieChartView(context: Context) : View(context) {
         invalidate()
     }
 
+    private fun isGroupSlice(data: PieChartData) = data.id === OtherSliceId || data.id === MainSliceId
+
     /**
      * Sets the currently selected slice index.
      * If an animation is in progress, the choice is queued and applied when it ends.
@@ -422,6 +555,7 @@ public class PieChartView(context: Context) : View(context) {
     @MainThread
     public fun setSelectedIndex(index: Int, shouldInvalidate: Boolean = true) {
         if (index != -1 && index !in dataset.indices) return
+        if (index != -1 && isGroupSlice(dataset[index])) return
 
         if (isAnimating()) {
             // Wait for animation to be done
@@ -488,14 +622,12 @@ public class PieChartView(context: Context) : View(context) {
     // ==================================================================
     override fun setPadding(left: Int, top: Int, right: Int, bottom: Int) {
         super.setPadding(left, top, right, bottom)
-        calculateBounds(width, height)
-        snapToFinalState()
+        relayout()
     }
 
     override fun setPaddingRelative(start: Int, top: Int, end: Int, bottom: Int) {
         super.setPaddingRelative(start, top, end, bottom)
-        calculateBounds(width, height)
-        snapToFinalState()
+        relayout()
     }
 
     // ==================================================================
@@ -524,10 +656,13 @@ public class PieChartView(context: Context) : View(context) {
     }
 
     private fun rebuildSlices() {
+        // A slice is a share of the whole data, not of what is on the ring: with the small slices
+        // expanded, the ring holds the small ones and one for the rest.
         allSlices = dataset.mapIndexed { index, data ->
-            val fraction = if (total.signum() > 0) data.value.divide(total, MathContext.DECIMAL64).toFloat() else 0f
-            SelectedSlice(index, data, total, fraction)
+            val fraction = if (sourceTotal.signum() > 0) data.value.divide(sourceTotal, MathContext.DECIMAL64).toFloat() else 0f
+            SelectedSlice(index, data, sourceTotal, fraction)
         }
+        centerSlices = allSlices.filterNot { isGroupSlice(it.data) }
     }
 
     /** Whether the center fits is worked out when the size, the hole or the data change, not per selection. */
@@ -542,11 +677,11 @@ public class PieChartView(context: Context) : View(context) {
 
     private fun computeCenterAvailability(): Boolean {
         val renderer = centerRenderer ?: return false
-        if (centerArea.isEmpty || allSlices.isEmpty()) return false
+        if (centerArea.isEmpty || centerSlices.isEmpty()) return false
         return when (val visibility = centerVisibility) {
             CenterVisibility.Always -> true
             CenterVisibility.Never -> false
-            CenterVisibility.WhenFits -> renderer.fits(centerArea, allSlices)
+            CenterVisibility.WhenFits -> renderer.fits(centerArea, centerSlices)
             is CenterVisibility.MinHoleRatio -> holeRadiusRatio >= visibility.ratio
         }
     }
@@ -559,14 +694,14 @@ public class PieChartView(context: Context) : View(context) {
         if (alpha <= 0f || area.isEmpty) return
 
         if (alpha >= 1f) {
-            renderer.draw(canvas, area, slice, allSlices)
+            renderer.draw(canvas, area, slice, centerSlices)
         } else {
             // Any renderer fades with the chart, whether or not it knows about alpha.
             val checkpoint = canvas.saveLayerAlpha(
                 cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius,
                 (alpha * 255f).toInt()
             )
-            renderer.draw(canvas, area, slice, allSlices)
+            renderer.draw(canvas, area, slice, centerSlices)
             canvas.restoreToCount(checkpoint)
         }
     }
@@ -646,7 +781,7 @@ public class PieChartView(context: Context) : View(context) {
         val pending = pendingSelectedIndex
         if (pending != null) {
             pendingSelectedIndex = null
-            if (pending == -1 || pending in dataset.indices) {
+            if (pending == -1 || (pending in dataset.indices && !isGroupSlice(dataset[pending]))) {
                 selectedIndex = pending
                 invalidate()
             }
@@ -785,8 +920,7 @@ public class PieChartView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        calculateBounds(w, h)
-        snapToFinalState()
+        relayout()
     }
 
     private fun calculateBounds(w: Int, h: Int) {
@@ -1001,8 +1135,15 @@ public class PieChartView(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> {
                 val clickedIndex = if (isTap) hitTestChunk(event.x, event.y) else -1
                 if (clickedIndex >= 0) {
-                    onChunkClickListener?.invoke(dataset[clickedIndex])
-                    setSelectedIndex(clickedIndex)
+                    val clicked = dataset[clickedIndex]
+                    when {
+                        clicked.id === OtherSliceId -> expandGroup()
+                        clicked.id === MainSliceId -> collapseGroup()
+                        else -> {
+                            onChunkClickListener?.invoke(clicked)
+                            setSelectedIndex(clickedIndex)
+                        }
+                    }
                     performClick()
                     return true
                 }
@@ -1039,6 +1180,9 @@ public class PieChartView(context: Context) : View(context) {
         private const val DEFAULT_ENSURE_RENDERABLE_SLICES = false
         private const val DEFAULT_ROUND_INNER_CORNERS = true
         private const val DEFAULT_DISABLED_COLOR: Int = Color.LTGRAY
+        private const val DEFAULT_GROUP_SMALL_SLICES = false
+        private const val DEFAULT_OTHER_SLICE_COLOR: Int = 0xFF8A93A6.toInt()
+        private const val DEFAULT_MAIN_SLICE_COLOR: Int = 0xFF2B73E3.toInt()
 
         // Default animation values
         private const val DEFAULT_REVEAL_ANIMATION_DURATION = 600L

@@ -24,29 +24,63 @@ internal object PieChartMockData {
         "Data",
         "Logistics",
         "Partnerships",
+        "Compliance",
+        "Procurement",
+        "Training",
+        "Quality",
+        "Facilities",
+        "Analytics",
+        "Brand",
+        "Community",
+        "Payroll",
+        "Strategy",
+        "Innovation",
+        "Cloud",
+        "Mobile",
+        "Accounting",
+        "Recruiting",
     )
 
-    /** Fifteen distinct hues, ordered so neighbouring slices stay easy to tell apart. */
+    /**
+     * Thirty colors that are easy to tell apart. They are far from each other in OKLab (a color
+     * space where distance follows what the eye sees), and ordered so that neighbouring slices,
+     * and slices two apart, never look alike. The first five are the default chart's.
+     */
     val colors: List<Int> = listOf(
         "#F24822", // red
         "#FF9E42", // orange
         "#FFC943", // amber
         "#A8D94F", // lime
         "#2EA659", // green
-        "#5AD8CC", // aqua
-        "#3DADFF", // sky
-        "#3373E5", // blue
-        "#6C5CE7", // indigo
+        "#B485B8", // mauve
         "#A55EEA", // violet
-        "#D94099", // magenta
-        "#FF7096", // pink
+        "#FFB6A2", // peach
+        "#336314", // forest
+        "#5AD8CC", // aqua
+        "#3373E5", // blue
+        "#C8B222", // mustard
         "#8C6640", // brown
+        "#D94099", // magenta
+        "#3DADFF", // sky
+        "#DEBAF6", // lilac
+        "#4247A6", // navy
+        "#D77C63", // terracotta
+        "#9D486B", // plum
+        "#49A9AE", // turquoise
+        "#6C5CE7", // indigo
+        "#E885F1", // orchid
+        "#A2041C", // crimson
+        "#AC9754", // sand
         "#5C6B84", // slate
+        "#FF7096", // pink
+        "#861E86", // purple
+        "#19D27F", // mint
         "#0E7C86", // deep teal
+        "#878BF2", // periwinkle
     ).map { it.toColorInt() }
 
     /** Rows past this count are added empty (value 0) for the user to fill in. */
-    const val MAX_COUNT = 15
+    const val MAX_COUNT = 30
 
     /** Rows beyond the sample labels have no label. */
     fun labelAt(index: Int): String = labels.getOrNull(index).orEmpty()

@@ -7,12 +7,16 @@ import android.graphics.RectF
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.dp
 import io.github.mohamadjavadx.piechart.sample.utils.dpf
 import io.github.mohamadjavadx.piechart.sample.utils.sp
 
-/** A label with the current value, and − / + buttons that change it by one. */
+/**
+ * A label with the current value, and − / + buttons that change it by one. Holding a button down
+ * keeps changing the value by one until the button is let go or the end of the range is reached.
+ */
 internal class StepperView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -51,6 +55,25 @@ internal class StepperView @JvmOverloads constructor(
     private var isPlusPressed = false
     private val minusRipple = RippleFade(this)
     private val plusRipple = RippleFade(this)
+
+    // Whether the press went on long enough to repeat; then letting go is not one more click.
+    private var hasRepeated = false
+    private val repeatHeld = object : Runnable {
+        override fun run() {
+            val minus = isMinusPressed
+            if (!minus && !isPlusPressed) return
+            hasRepeated = true
+            isRepeating = true
+            commitUserValue(if (minus) value - 1 else value + 1)
+            isRepeating = false
+            if (if (minus) value > 0 else value < maxValue) {
+                postDelayed(this, REPEAT_INTERVAL_MS)
+            } else {
+                // The button is off now: let the press fade out, the finger may stay down.
+                release(minus)
+            }
+        }
+    }
 
     init {
         setPadding(16.dp, 0, 16.dp, 0)
@@ -122,6 +145,10 @@ internal class StepperView @JvmOverloads constructor(
                 isPlusPressed = !isMinusPressed && plusRect.contains(event.x, event.y) && value < maxValue
                 if (isMinusPressed) minusRipple.reset()
                 if (isPlusPressed) plusRipple.reset()
+                if (isMinusPressed || isPlusPressed) {
+                    hasRepeated = false
+                    postDelayed(repeatHeld, ViewConfiguration.getLongPressTimeout().toLong())
+                }
                 invalidate()
                 return isMinusPressed || isPlusPressed
             }
@@ -138,6 +165,7 @@ internal class StepperView @JvmOverloads constructor(
                 val plus = isPlusPressed
                 if (!minus && !plus) return false
                 release(minus)
+                if (hasRepeated) return true
                 commitUserValue(if (minus) value - 1 else value + 1)
                 performClick()
                 return true
@@ -153,6 +181,7 @@ internal class StepperView @JvmOverloads constructor(
     }
 
     private fun release(minus: Boolean) {
+        removeCallbacks(repeatHeld)
         if (minus) {
             isMinusPressed = false
             minusRipple.fadeOut()
@@ -163,6 +192,7 @@ internal class StepperView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(repeatHeld)
         minusRipple.reset()
         plusRipple.reset()
         super.onDetachedFromWindow()
@@ -176,5 +206,6 @@ internal class StepperView @JvmOverloads constructor(
 
     private companion object {
         const val DISABLED_ALPHA = 77 // ~0.3
+        const val REPEAT_INTERVAL_MS = 70L
     }
 }

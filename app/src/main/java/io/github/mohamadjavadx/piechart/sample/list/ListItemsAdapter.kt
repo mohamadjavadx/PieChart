@@ -40,7 +40,7 @@ import java.math.BigDecimal
  * (see [isValueEcho]).
  */
 internal class ListItemsAdapter(
-    private val onIntControlChanged: (control: IntControl, newValue: Int) -> Unit,
+    private val onIntControlChanged: (control: IntControl, newValue: Int, repeated: Boolean) -> Unit,
     private val onUnitSelected: (control: IntControl, unit: SizeUnit) -> Unit,
     private val onBooleanControlChanged: (control: BooleanControl, newValue: Boolean) -> Unit,
     private val onButtonClicked: (button: Button) -> Unit,
@@ -225,7 +225,9 @@ internal class ListItemsAdapter(
         view = row.slider,
         unitToggle = row.toggle,
         root = row,
-        onChanged = { position, newValue -> withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) } },
+        onChanged = { position, newValue, repeated ->
+            withItemAt<IntControl>(position) { onIntControlChanged(it, newValue, repeated) }
+        },
         onUnitSelected = { position, unit -> withItemAt<IntControl>(position) { onUnitSelected(it, unit) } },
     )
 
@@ -233,7 +235,9 @@ internal class ListItemsAdapter(
         view = view,
         unitToggle = null,
         root = view,
-        onChanged = { position, newValue -> withItemAt<IntControl>(position) { onIntControlChanged(it, newValue) } },
+        onChanged = { position, newValue, repeated ->
+            withItemAt<IntControl>(position) { onIntControlChanged(it, newValue, repeated) }
+        },
         onUnitSelected = { _, _ -> },
     )
 

@@ -18,3 +18,16 @@ public data class PieChartData(
     val value: BigDecimal,
     val color: Int,
 )
+
+/**
+ * The id of the slice that stands for the small slices while [PieChartView] has them grouped
+ * ([PieChartView.groupSmallSlices]). It is in [PieChartView.currentDataset], never in the data
+ * that was given to the chart.
+ */
+public data object OtherSliceId
+
+/**
+ * The id of the slice that stands for all the other slices while the small ones are expanded
+ * ([PieChartView.isGroupExpanded]).
+ */
+public data object MainSliceId

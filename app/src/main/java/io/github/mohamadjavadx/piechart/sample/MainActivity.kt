@@ -1,7 +1,10 @@
 package io.github.mohamadjavadx.piechart.sample
 
 import android.graphics.Color
+import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -10,9 +13,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -46,6 +51,7 @@ import io.github.mohamadjavadx.piechart.sample.model.rowId
 import io.github.mohamadjavadx.piechart.sample.theme.Colors
 import io.github.mohamadjavadx.piechart.sample.utils.closeKeyboard
 import io.github.mohamadjavadx.piechart.sample.utils.dp
+import io.github.mohamadjavadx.piechart.sample.utils.dpf
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -53,7 +59,7 @@ class MainActivity : AppCompatActivity() {
     private val viewModel by lazy { ViewModelProvider(this)[MainViewModel::class.java] }
 
     private val listAdapter = ListItemsAdapter(
-        onIntControlChanged = { control, newValue -> viewModel.updateIntControl(control, newValue) },
+        onIntControlChanged = { control, newValue, repeated -> viewModel.updateIntControl(control, newValue, repeated) },
         onUnitSelected = { control, unit -> viewModel.selectUnit(control, unit) },
         onBooleanControlChanged = { control, newValue -> viewModel.updateBooleanControl(control, newValue) },
         onButtonClicked = { viewModel.onButtonClicked(it) },
@@ -67,6 +73,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chartView: PieChartView
     private lateinit var rvItems: RecyclerView
     private lateinit var selectorView: SegmentedSelectorView
+    private lateinit var backChip: Button
+
+    /** Leaves the expanded group; it only takes the back gesture while there is one to leave. */
+    private val backCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            chartView.collapseGroup()
+        }
+    }
 
     private var shownTab: SampleTab? = null
 
@@ -82,6 +96,7 @@ class MainActivity : AppCompatActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
+        onBackPressedDispatcher.addCallback(this, backCallback)
         selectorView = buildSelector()
         rvItems = buildItemsList()
         rootView = FrameLayout(this).apply {
@@ -117,19 +132,36 @@ class MainActivity : AppCompatActivity() {
         orientation = LinearLayout.VERTICAL
 
         addView(
-            TextView(context).apply {
-                text = getString(R.string.chart_title)
-                textSize = 18f
-                setTextColor(Colors.colorText)
-                setTypeface(typeface, Typeface.BOLD)
+            LinearLayout(context).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(
+                    TextView(context).apply {
+                        text = getString(R.string.chart_title)
+                        textSize = 18f
+                        setTextColor(Colors.colorText)
+                        setTypeface(typeface, Typeface.BOLD)
+                    },
+                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = 16.dp }
+                )
+                backChip = buildBackChip()
+                addView(backChip, LinearLayout.LayoutParams(WRAP_CONTENT, BACK_CHIP_HEIGHT_DP.dp).apply { marginEnd = 16.dp })
             },
-            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = 16.dp }
+            // Tall enough for the chip, so that it can come and go without moving the chart.
+            LinearLayout.LayoutParams(MATCH_PARENT, TITLE_ROW_HEIGHT_DP.dp)
         )
 
         chartView = PieChartView(context).apply {
             setPadding(16.dp)
             defaultUnselectedAlpha = unselectedAlpha
-            centerVisibility = CenterVisibility.WhenFits
+            // Slices that are too small to see are grouped into one; a tap on it expands it into a ring
+            // of its own, next to one slice in the primary color for all the others.
+            setStyle(
+                groupSmallSlices = true,
+                otherSliceColor = Colors.colorTextVariant,
+                mainSliceColor = Colors.colorAccent,
+            )
+            setOnGroupExpandedChangedListener(::onGroupExpandedChanged)
+            centerVisibility = CenterVisibility.MinHoleRatio(0.5f)
             // The selected slice's label and value in the hole, shown while the hole is big enough.
             centerRenderer = DefaultCenterRenderer(
                 CenterInfoStyle(labelColor = Colors.colorTextVariant, valueColor = Colors.colorText)
@@ -150,6 +182,33 @@ class MainActivity : AppCompatActivity() {
             View(context).apply { setBackgroundColor(Colors.colorStroke) },
             LinearLayout.LayoutParams(MATCH_PARENT, 1.dp)
         )
+    }
+
+    private fun buildBackChip() = Button(this).apply {
+        text = getString(R.string.chart_back)
+        isAllCaps = false
+        textSize = 13f
+        setTypeface(typeface, Typeface.BOLD)
+        setTextColor(Colors.colorAccent)
+        stateListAnimator = null
+        minHeight = 0
+        minimumHeight = 0
+        setPadding(12.dp, 0, 12.dp, 0)
+        val shape = GradientDrawable().apply {
+            setColor(Colors.colorTrack)
+            cornerRadius = BACK_CHIP_HEIGHT_DP.dpf / 2f
+        }
+        background = RippleDrawable(ColorStateList.valueOf(Colors.colorRipple), shape, null)
+        visibility = View.INVISIBLE
+        setOnClickListener { chartView.collapseGroup() }
+    }
+
+    /** All three ways out of the expanded group: this chip, the back gesture, a tap on the main slice. */
+    private fun onGroupExpandedChanged(isExpanded: Boolean) {
+        backChip.visibility = if (isExpanded) View.VISIBLE else View.INVISIBLE
+        backCallback.isEnabled = isExpanded
+        // The slices that were on the ring are gone, or back: select the tapped row again if it is there.
+        chartView.post { restoreSelection() }
     }
 
     private fun buildSelector() = SegmentedSelectorView(this).apply {
@@ -257,11 +316,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun showChartData(data: List<PieChartData>) {
         chartView.setData(data)
-        // The chart keeps a selected slice across data changes, but a row that had dropped out
-        // (its value was 0) is gone from the chart; select it again when it comes back. The chart
-        // drops rows without a value, so look the row up in its own list of slices.
+        restoreSelection()
+    }
+
+    /**
+     * The chart keeps a selected slice across data changes, but a row that had dropped out (its
+     * value was 0, or it is inside the group) is gone from the chart; select it again when it comes
+     * back. The chart's own slices are what to look in: it drops rows without a value and groups
+     * small ones, and the slices it adds for that have ids that are not row ids.
+     */
+    private fun restoreSelection() {
         val selectedRowId = viewModel.selectedRowId.value ?: return
-        val index = chartView.currentDataset.indexOfFirst { it.rowId == selectedRowId }
+        val index = chartView.currentDataset.indexOfFirst { it.id == selectedRowId }
         if (index >= 0 && index != chartView.currentSelectedIndex) chartView.setSelectedIndex(index)
     }
 
@@ -295,6 +361,8 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val CHART_HEIGHT_TO_WIDTH = 0.7f
+        const val TITLE_ROW_HEIGHT_DP = 36
+        const val BACK_CHIP_HEIGHT_DP = 30
         const val OPAQUE_ALPHA = 255
         const val MAX_RECYCLED_ROWS = 20
         const val WARMED_ROWS = 8
