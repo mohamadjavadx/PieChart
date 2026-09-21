@@ -26,7 +26,7 @@ on by default. The signature of `setStyle` changed and charts can look different
 - **Grouping of small slices.** `setStyle(groupSmallSlices = true)` merges the slices that would have less than 2° left
   after the gap into one slice, in `otherSliceColor`, of which at least 10° is seen whatever the gap. It is off by default.
   - A tap on it, or `expandGroup()`, opens it: the big slices are squeezed into a 90° arc, drawn dimmed (`mainSliceDim`,
-    0.7 by default) inside one rounded slice, and the small slices share the other 270°. The change is animated: the big
+    0.6 by default) inside one rounded slice, and the small slices share the other 270°. The change is animated: the big
     slices shrink into the arc.
   - A tap on the arc, or `collapseGroup()`, goes back. Expanding selects the first of the small slices and collapsing
     selects the first slice, by tap or by calling the functions, and `setOnChunkClickListener` gets the slice.

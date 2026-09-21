@@ -1,14 +1,19 @@
 # PieChart
 
 [![](https://jitpack.io/v/mohamadjavadx/PieChart.svg)](https://jitpack.io/#mohamadjavadx/PieChart)
+[![npm](https://img.shields.io/npm/v/@mohamadjavadx/piechart?label=npm%20(web))](https://www.npmjs.com/package/@mohamadjavadx/piechart)
 
 An animated **pie / donut chart** for Android, written as a plain Kotlin `View`: no Compose, no XML.
 
 Tap a slice and it lifts off the ring with a soft shadow while its details appear in the middle. Data changes morph
 smoothly, and slices that are too small to see fold into a single one that opens on tap.
 
+**Also for the web:** the same chart in SVG, as a web component, a React component or a plain class.
+**[Try the live demo](https://mohamadjavadx.github.io/PieChart/)** · [Web version](#web-version)
+
 [Install](#install) · [Quick start](#quick-start) · [Selection](#selection) · [Styling](#styling) ·
-[Small slices](#small-slices) · [Center content](#details-in-the-hole) · [Changelog](CHANGELOG.md)
+[Small slices](#small-slices) · [Center content](#details-in-the-hole) · [Web version](#web-version) ·
+[Changelog](CHANGELOG.md)
 
 <p align="center">
   <img src="docs/images/demo.gif" width="300" alt="A tour of the demo app: the ring reveals itself, slices are selected, the style changes live, data is added and the ring morphs, tiny slices are grouped into Other, and tapping it expands them next to the big slices folded into one dimmed arc">
@@ -143,7 +148,7 @@ Every option is also readable as a property of the same name.
 | `selectedShadowOffsetRatio` | `0.06` | Shadow shift as a share of the hole radius; never more than half the ring thickness. |
 | `groupSmallSlices` | `false` | Merge the slices that are too small to see into one slice you can tap; see [Small slices](#small-slices). |
 | `otherSliceColor` | gray | Color of the merged slice. |
-| `mainSliceDim` | `0.7` | How much the big slices are dimmed while the small ones are expanded. |
+| `mainSliceDim` | `0.6` | How much the big slices are dimmed while the small ones are expanded. |
 | `disabledColor` | light gray | Color of the empty-state ring. |
 
 **Dims.** Every option that ends in `Dim` is a fraction from 0, not dimmed, to 1, invisible: the slice is drawn at
@@ -330,6 +335,21 @@ the chart, a tap on the dimmed arc, or system Back.
   <img src="docs/images/demo-settings.png" width="260" alt="Demo: the chart on top, and the settings below it: number of segments, hole ratio, corner radius and gap">
   <img src="docs/images/demo-data.png" width="260" alt="Demo: the Data tab, one row per slice with its label and value">
 </p>
+
+## Web version
+
+The same look and the same features, for web pages: drawn with SVG, with no dependencies, animated, and accessible to
+screen readers and the keyboard. It comes as a `<pie-chart>` web component, a React component and a plain class, and
+is checked against this library's own code and pixels.
+
+```
+npm install @mohamadjavadx/piechart
+```
+
+- **[Live demo](https://mohamadjavadx.github.io/PieChart/)**: a chart to tap, the settings playground of the demo app
+  above, and the web component and React demos.
+- [Documentation](https://github.com/mohamadjavadx/PieChart/tree/web/web#readme), with the options, the accessibility
+  and the performance numbers, and the package on [npm](https://www.npmjs.com/package/@mohamadjavadx/piechart).
 
 ## Limitations
 
