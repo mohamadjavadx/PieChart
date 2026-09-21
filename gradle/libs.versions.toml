@@ -1,7 +1,7 @@
 [versions]
 agp = "9.0.0"
 coreKtx = "1.18.0"
-annotation = "1.9.1"
+annotation = "1.10.0"
 appcompat = "1.7.0"
 activity = "1.13.0"
 recyclerview = "1.3.2"
