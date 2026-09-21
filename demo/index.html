@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PieChart for the web</title>
+  <style>
+    :root { --ink: #2b3245; --muted: #8a93a6; --line: #e6e9f0; --accent: #2b73e3; --bg: #fff; }
+    @media (prefers-color-scheme: dark) { :root { --ink: #e8ecf5; --muted: #98a1b8; --line: #2a3142; --bg: #12151c; } }
+    /* Two quick taps on a button (the stepper's + and -) are two taps, not a zoom */
+    html, body, button, input, label { touch-action: manipulation; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
+    main { max-width: 420px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 18px; margin: 4px 0 12px; }
+    #chart { height: 340px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .row output { color: var(--accent); font-weight: 600; margin-left: 6px; }
+    input[type=range] { width: 55%; accent-color: var(--accent); }
+    button { font: inherit; width: 40px; height: 40px; border-radius: 20px; border: 1px solid var(--line); background: none; color: var(--ink); cursor: pointer; }
+    .stepper { display: flex; align-items: center; gap: 12px; }
+    #back { display: none; font-size: 13px; width: auto; height: 30px; padding: 0 12px; color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Pie Chart <button id="back">Back to all slices</button></h1>
+  <div id="chart"></div>
+
+  <div class="row"><span>Number of Segments <output id="count-out">5</output></span>
+    <span class="stepper"><button id="minus">−</button><button id="plus">+</button></span></div>
+  <div class="row"><label for="hole">Hole Ratio <output id="hole-out">85%</output></label><input id="hole" type="range" min="0" max="95" value="85"></div>
+  <div class="row"><label for="corner">Corner Radius <output id="corner-out">4 dp</output></label><input id="corner" type="range" min="0" max="16" value="4"></div>
+  <div class="row"><label for="gap">Gap <output id="gap-out">4 dp</output></label><input id="gap" type="range" min="0" max="16" value="4"></div>
+  <div class="row"><label for="group">Group Small Slices</label><input id="group" type="checkbox" checked></div>
+  <div class="row"><label for="dim">Dim Other Slices</label><input id="dim" type="checkbox"></div>
+</main>
+
+<script type="module">
+  import { PieChart, Decimal, createDefaultCenter } from "../dist/index.js";
+
+  const PALETTE = ["#F24822", "#FF9E42", "#FFC943", "#A8D94F", "#2EA659", "#B485B8", "#A55EEA", "#FFB6A2", "#336314", "#5AD8CC",
+    "#3373E5", "#C8B222", "#8C6640", "#D94099", "#3DADFF", "#DEBAF6", "#4247A6", "#D77C63", "#9D486B", "#49A9AE",
+    "#6C5CE7", "#E885F1", "#A2041C", "#AC9754", "#5C6B84", "#FF7096", "#861E86", "#19D27F", "#0E7C86", "#878BF2"];
+  const LABELS = ["Engineering", "Product", "Design", "Marketing", "Sales", "Support", "Finance", "Legal", "HR", "Operations"];
+
+  /** The demo's sample data: values halve and the last two are equal, 100 in all. */
+  const sample = (count) => Array.from({ length: count }, (_, i) => {
+    const k = Math.min(i + 1, Math.max(count - 1, 1));
+    return { id: i + 1, label: LABELS[i] ?? `Row ${i + 1}`, value: Decimal.parse(`${100n * 5n ** BigInt(k)}e-${k}`), color: PALETTE[i % PALETTE.length] };
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  /** The text in the hole, in the page's colors (a fill can't take a CSS variable, so they are read here). */
+  const center = () => createDefaultCenter({ labelColor: css("--muted"), valueColor: css("--ink"), suffixColor: css("--ink") });
+  const chart = new PieChart($("chart"), {
+    center: center(),
+    padding: 16,
+    style: { cornerRadiusDp: 4, visualGapDp: 4, selectedShadowOffsetDp: 6, groupSmallSlices: true, unselectedDim: 0 },
+  });
+  window.chart = chart; // for poking at it from the console
+
+  let count = 5;
+  const show = () => { chart.setData(sample(count)); $("count-out").textContent = count; };
+  show();
+  chart.setSelectedIndex(0);
+
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => chart.model.setCenterRenderer(center()));
+  chart.model.onGroupExpandedChanged = (open) => { $("back").style.display = open ? "inline-block" : "none"; };
+  $("back").onclick = () => chart.collapseGroup();
+
+  $("plus").onclick = () => { count = Math.min(count + 1, 30); show(); };
+  $("minus").onclick = () => { count = Math.max(count - 1, 1); show(); };
+  $("hole").oninput = (e) => { chart.setStyle({ holeRadiusRatio: e.target.value / 100 }); $("hole-out").textContent = `${e.target.value}%`; };
+  $("corner").oninput = (e) => { chart.setStyle({ cornerRadiusDp: +e.target.value }); $("corner-out").textContent = `${e.target.value} dp`; };
+  $("gap").oninput = (e) => { chart.setStyle({ visualGapDp: +e.target.value }); $("gap-out").textContent = `${e.target.value} dp`; };
+  $("group").onchange = (e) => chart.setStyle({ groupSmallSlices: e.target.checked });
+  $("dim").onchange = (e) => chart.setStyle({ unselectedDim: e.target.checked ? 0.6 : 0 });
+</script>
+</body>
+</html>
