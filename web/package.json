@@ -1,6 +1,6 @@
 {
   "name": "@mohamadjavadx/piechart",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An animated, accessible pie / donut chart for the web (SVG, no dependencies): a web component, a React component and a plain class. The same look and features as the Android PieChart library.",
   "keywords": [
     "pie chart",

@@ -2,6 +2,14 @@
 
 The Android library has its own, in [`../CHANGELOG.md`](../CHANGELOG.md). Web releases are tagged `web-v<version>`.
 
+## 0.1.1
+
+Documentation only: the code is the same as in 0.1.0.
+
+- The README has pictures of the chart, the install command and the release status, and a link to the live demo.
+- **[Live demo](https://mohamadjavadx.github.io/PieChart/)**: a chart to tap, the settings playground of the Android demo,
+  and the web component and React demos. The demo pages no longer zoom when a button is tapped twice quickly.
+
 ## 0.1.0
 
 The first release of the web version: the Android library's look and features, drawn with SVG, with no dependencies.
