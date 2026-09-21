@@ -1,0 +1,16 @@
+{
+  "name": "@mohamadjavadx/piechart",
+  "version": "0.0.0",
+  "description": "An animated pie / donut chart for the web: the same look and features as the Android PieChart library.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
