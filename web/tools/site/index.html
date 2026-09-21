@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PieChart for the web</title>
+  <meta name="description" content="An animated, accessible donut chart for the web: a web component, a React component and a plain class. No dependencies.">
+  <style>
+    :root { color-scheme: light dark; --bg: #fff; --ink: #2b3245; --muted: #6b7489; --line: #e6e9f0; --card: #f6f7fb; --accent: #2b73e3; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --ink: #e8ecf5; --muted: #98a1b8; --line: #2a3142; --card: #1a1f2a; --accent: #6ea2f5; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 32px 16px 56px; }
+    h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; }
+    .lead { margin: 0 0 8px; color: var(--muted); }
+    pie-chart { max-width: 380px; margin: 8px auto 0; --pie-chart-label-color: var(--muted); }
+    .hint { text-align: center; font-size: 14px; color: var(--muted); margin: 0 0 24px; }
+    pre { margin: 0 0 24px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cards { display: grid; gap: 10px; margin: 0 0 24px; }
+    .cards a { display: block; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: inherit; text-decoration: none; background: var(--card); }
+    .cards a:hover, .cards a:focus-visible { border-color: var(--accent); }
+    .cards b { display: block; color: var(--accent); }
+    .cards span { color: var(--muted); font-size: 14px; }
+    footer { font-size: 14px; color: var(--muted); }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>PieChart for the web</h1>
+  <p class="lead">An animated, accessible donut chart: the look and features of the Android library, drawn with SVG. A web component, a React component and a plain class, with no dependencies.</p>
+
+  <pie-chart center selected-index="0" group-small-slices corner-radius-dp="4" gap-dp="4" shadow-offset-dp="6" label="Spending by category"
+    data='[{"label":"Rent","value":1200},{"label":"Food","value":450.5},{"label":"Transport","value":260},{"label":"Utilities","value":180},{"label":"Fun","value":120.25},{"label":"Health","value":90},{"label":"Gifts","value":40},{"label":"Coffee","value":12.5},{"label":"Books","value":8},{"label":"Parking","value":3.25},{"label":"Stickers","value":1.5}]'></pie-chart>
+  <p class="hint">Tap a slice, or tap the gray one to open it. With the keyboard: Tab, then the arrow keys, Enter and Escape.</p>
+
+  <pre>npm install @mohamadjavadx/piechart</pre>
+
+  <div class="cards">
+    <a href="demo/index.html"><b>Settings playground</b><span>The Android demo's controls: segments, hole, corners, gap, grouping, dimming.</span></a>
+    <a href="demo/element.html"><b>The &lt;pie-chart&gt; element</b><span>Attributes, properties and events, in plain HTML.</span></a>
+    <a href="demo/react.html"><b>The React component</b><span>Data changes that morph, and callbacks.</span></a>
+  </div>
+
+  <footer>
+    <a href="https://github.com/mohamadjavadx/PieChart/tree/web/web#readme">Documentation</a> ·
+    <a href="https://www.npmjs.com/package/@mohamadjavadx/piechart">npm</a> ·
+    <a href="https://github.com/mohamadjavadx/PieChart">GitHub</a>
+  </footer>
+</main>
+<script type="module">import "./dist/element/register.js";</script>
+</body>
+</html>

@@ -125,6 +125,16 @@ library's. A version that is on npm already is left alone, so a failed run can b
 (*Run workflow*, with the tag). npm does not let a published version be replaced: to fix a bad release, publish the next one
 (and `npm deprecate` the bad one).
 
+### The live demo
+
+`.github/workflows/web-demo.yml` builds the demo site (a landing page with a live chart, the settings playground, and the
+`<pie-chart>` and React demos; `npm run site` in `web/` builds the same thing into `web/_site/`) and puts it on the `gh-pages`
+branch. It runs for every change to `web/` on the `web` branch and for every `web-v*` tag, so the demo is always the latest
+code and needs no merge into `main`. The branch holds only the site, as a single commit that each run replaces.
+
+Set up once, after the first run has created the branch: *Settings, Pages, Build and deployment, Source: Deploy from a
+branch*, branch `gh-pages`, folder `/ (root)`. The site is then at <https://mohamadjavadx.github.io/PieChart/>.
+
 ## Other places to publish
 
 - **GitHub Packages:** add a Maven repository `https://maven.pkg.github.com/mohamadjavadx/PieChart` (user name plus a token with

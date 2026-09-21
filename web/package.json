@@ -68,7 +68,8 @@
     "bench": "node tools/bench.ts",
     "demo": "npm run build && node tools/serve.ts",
     "prepack": "npm run build",
-    "images": "npm run build && node tools/readme-images.ts"
+    "images": "npm run build && node tools/readme-images.ts",
+    "site": "npm run build && node tools/build-site.ts"
   },
   "peerDependencies": {
     "react": ">=18"

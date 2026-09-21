@@ -13,6 +13,8 @@ npm install @mohamadjavadx/piechart
   <img src="https://raw.githubusercontent.com/mohamadjavadx/PieChart/web/web/docs/images/web-hero.png" width="640" alt="The same donut chart twice, on a light and on a dark background: the first slice is selected, and its label, value and total are in the hole">
 </p>
 
+**[Try it live](https://mohamadjavadx.github.io/PieChart/)**: a chart to tap, the settings playground of the Android demo, and the web component and React demos.
+
 | | |
 |---|---|
 | Published | **0.1.0** on [npm](https://www.npmjs.com/package/@mohamadjavadx/piechart) (21 September 2026), with a provenance statement that ties the package to the workflow run that built it, and as a [GitHub Release](https://github.com/mohamadjavadx/PieChart/releases/tag/web-v0.1.0) with the package attached. It is an early release (0.x): the API can still change between minor versions, and each change is in the [changelog](CHANGELOG.md). |
@@ -49,6 +51,7 @@ npm run typecheck   # tsc --noEmit, strict, tests included
 npm run build       # ES modules and .d.ts into dist/
 npm run verify      # types, tests, build, and a look at what npm would publish
 npm run bench       # what a frame costs, from 5 to 1000 slices
+npm run site        # builds the demo site into _site/ (what the live demo serves)
 npm run images      # draws the pictures of this README into docs/images (needs Chrome)
 ```
 

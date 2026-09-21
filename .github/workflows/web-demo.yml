@@ -1,0 +1,59 @@
+name: Web demo
+
+# Builds the demo site of the web version (a landing page and three demo pages, see web/tools/build-site.ts) and puts it on
+# the gh-pages branch, which GitHub Pages serves at https://<owner>.github.io/<repo>/. It runs for every change to web/ on the
+# web branch and for every web release tag, so the demo is the latest code, and it works without merging into main.
+#
+# Set up once: Settings, Pages, "Deploy from a branch", branch gh-pages, folder / (root). The branch appears after the first run.
+# See docs/RELEASING.md.
+
+on:
+  push:
+    branches: [web]
+    paths: ['web/**', '.github/workflows/web-demo.yml']
+    tags: ['web-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-demo
+  cancel-in-progress: false
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the site
+        working-directory: web
+        run: |
+          npm ci
+          npm run site
+
+      # The branch holds only the site, as one commit that replaces the last: nobody needs the history of a build.
+      - name: Publish it to the gh-pages branch
+        working-directory: web/_site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Demo site from ${GITHUB_SHA::7}"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push --force origin gh-pages
+          {
+            echo "### Demo site published"
+            echo
+            echo "Commit \`${GITHUB_SHA::7}\`, at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/ once GitHub Pages is set to serve the \`gh-pages\` branch."
+          } >> "$GITHUB_STEP_SUMMARY"

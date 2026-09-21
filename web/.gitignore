@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.tsbuildinfo
 tools/kotlin-fixtures/build/
+_site/
