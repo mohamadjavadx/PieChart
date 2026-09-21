@@ -7,6 +7,8 @@
   <style>
     :root { color-scheme: light dark; --bg: #fff; --ink: #2b3245; }
     @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --ink: #e8ecf5; } }
+    /* Two quick taps on a button (the stepper's + and -) are two taps, not a zoom */
+    html, body, button, input, label { touch-action: manipulation; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
     main { max-width: 420px; margin: 0 auto; padding: 16px; }
     pie-chart { --pie-chart-label-color: #8a93a6; }

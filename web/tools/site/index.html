@@ -8,6 +8,8 @@
   <style>
     :root { color-scheme: light dark; --bg: #fff; --ink: #2b3245; --muted: #6b7489; --line: #e6e9f0; --card: #f6f7fb; --accent: #2b73e3; }
     @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --ink: #e8ecf5; --muted: #98a1b8; --line: #2a3142; --card: #1a1f2a; --accent: #6ea2f5; } }
+    /* Two quick taps on a button (the stepper's + and -) are two taps, not a zoom */
+    html, body, button, input, label { touch-action: manipulation; }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
     main { max-width: 560px; margin: 0 auto; padding: 32px 16px 56px; }

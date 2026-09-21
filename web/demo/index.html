@@ -7,6 +7,8 @@
   <style>
     :root { --ink: #2b3245; --muted: #8a93a6; --line: #e6e9f0; --accent: #2b73e3; --bg: #fff; }
     @media (prefers-color-scheme: dark) { :root { --ink: #e8ecf5; --muted: #98a1b8; --line: #2a3142; --bg: #12151c; } }
+    /* Two quick taps on a button (the stepper's + and -) are two taps, not a zoom */
+    html, body, button, input, label { touch-action: manipulation; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
     main { max-width: 420px; margin: 0 auto; padding: 16px; }
     h1 { font-size: 18px; margin: 4px 0 12px; }
