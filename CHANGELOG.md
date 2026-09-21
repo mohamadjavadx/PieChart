@@ -37,7 +37,10 @@ on by default. The signature of `setStyle` changed and charts can look different
   corners can be in dp while the shadow is a ratio. A size in dp stays that size when the chart is resized;
   `cornerRadiusDp`, `selectedShadowOffsetDp` and `visualGapDp` tell which unit is in charge.
 - **Demo app:** the settings can be switched between dp and relative, small slices can be grouped (or not), the
-  number of segments runs on while + or − is held, and the sample data has 30 rows in 30 distinct colors.
+  number of segments runs on while + or − is held, the sample data has 30 rows in 30 distinct colors, and the sliders
+  and the stepper's + button keep the system's back gesture out of their way (a drag that starts at the end of a track no
+  longer closes the app), and so do the unit toggles when there is room: Android only honors about 200 dp of such area
+  per screen edge.
 
 ### Changed
 

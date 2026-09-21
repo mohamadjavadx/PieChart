@@ -3,6 +3,7 @@ package io.github.mohamadjavadx.piechart.sample.components
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewConfiguration
@@ -17,12 +18,15 @@ import kotlin.math.abs
  * Only a touch that starts within a band around the track counts. Anywhere else, e.g. on the
  * title, the touch goes on to the list behind the view. Subclasses draw the touch indicator
  * around their thumb with [drawTouchIndicator].
+ *
+ * The track runs almost to the edges of the screen, where a swipe is the system's back gesture:
+ * the area around the thumb's path is one that [GestureExclusionPlanner] keeps out of it.
  */
 internal abstract class DraggableIntControlView(
     context: Context,
     attrs: AttributeSet?,
     defStyleAttr: Int,
-) : IntControlView(context, attrs, defStyleAttr) {
+) : IntControlView(context, attrs, defStyleAttr), EdgeSwipeControl {
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val touchHalfHeight = 24.dp
@@ -32,6 +36,8 @@ internal abstract class DraggableIntControlView(
 
     // Not View.isPressed: that would also drive the framework's pressed-state drawables.
     private var isFingerDown = false
+    private val edgeArea = Rect()
+    private val edgeAreas = listOf(EdgeSwipeArea(edgeArea, EdgeSwipePriority.DRAGGED))
     private val touchIndicator = RippleFade(this)
     private val touchIndicatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Colors.colorRipple
@@ -51,6 +57,16 @@ internal abstract class DraggableIntControlView(
         if (alpha <= 0) return
         touchIndicatorPaint.alpha = alpha
         canvas.drawCircle(cx, cy, touchIndicatorRadius, touchIndicatorPaint)
+    }
+
+    /**
+     * The thumb and its touch indicator, along the whole track: the band a drag is grabbed in is
+     * wider, but there is little room for areas to keep out of the back gesture (see the planner).
+     */
+    override fun edgeSwipeAreas(): List<EdgeSwipeArea> {
+        val half = touchIndicatorRadius.toInt()
+        edgeArea.set(0, (trackCenterY - half).toInt().coerceAtLeast(0), width, (trackCenterY + half).toInt().coerceAtMost(height))
+        return edgeAreas
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

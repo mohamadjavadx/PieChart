@@ -3,6 +3,7 @@ package io.github.mohamadjavadx.piechart.sample.components
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.text.TextPaint
 import android.util.AttributeSet
@@ -21,7 +22,7 @@ internal class StepperView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : IntControlView(context, attrs, defStyleAttr) {
+) : IntControlView(context, attrs, defStyleAttr), EdgeSwipeControl {
 
     private val middlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Colors.colorText
@@ -75,8 +76,17 @@ internal class StepperView @JvmOverloads constructor(
         }
     }
 
+    // The + button is next to the edge of the screen, and is held down: keep the back gesture off it.
+    private val edgeArea = Rect()
+    private val edgeAreas = listOf(EdgeSwipeArea(edgeArea, EdgeSwipePriority.HELD))
+
     init {
         setPadding(16.dp, 0, 16.dp, 0)
+    }
+
+    override fun edgeSwipeAreas(): List<EdgeSwipeArea> {
+        edgeArea.set(plusRect.left.toInt(), plusRect.top.toInt(), width, plusRect.bottom.toInt())
+        return edgeAreas
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

@@ -38,6 +38,7 @@ import io.github.mohamadjavadx.piechart.PieChartView
 import io.github.mohamadjavadx.piechart.center.CenterInfoStyle
 import io.github.mohamadjavadx.piechart.center.CenterVisibility
 import io.github.mohamadjavadx.piechart.center.DefaultCenterRenderer
+import io.github.mohamadjavadx.piechart.sample.components.GestureExclusionPlanner
 import io.github.mohamadjavadx.piechart.sample.components.SegmentedSelectorView
 import io.github.mohamadjavadx.piechart.sample.list.ListItemAnimator
 import io.github.mohamadjavadx.piechart.sample.list.ListItemsAdapter
@@ -232,6 +233,9 @@ class MainActivity : AppCompatActivity() {
         recycledViewPool.setMaxRecycledViews(ItemViewType.DataSetRow.ordinal, MAX_RECYCLED_ROWS)
 
         itemAnimator = ListItemAnimator()
+
+        // A drag that starts at the end of a track must not be taken for the back gesture.
+        GestureExclusionPlanner(this).attach()
 
         addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
