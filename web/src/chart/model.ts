@@ -49,6 +49,8 @@ export interface ChartModelOptions {
   density?: number;
   /** How far outside the ring, and inside the hole, a tap still counts, in px. */
   touchPadding?: number;
+  /** What the slice that stands for the small slices is called; "Other" by default. */
+  otherLabel?: string;
 }
 
 interface RunningAnimation {
@@ -94,6 +96,7 @@ export class ChartModel {
   private outerTouchBound = 0;
 
   // What the chart was given, and what it shows for it.
+  private otherLabelText = "Other";
   private sourceData: Slice[] = [];
   private sourceTotal: Decimal = totalOf([]);
   private dataset: Slice[] = [];
@@ -131,6 +134,7 @@ export class ChartModel {
     this.clock = options.clock ?? (() => performance.now());
     this.density = options.density ?? 1;
     this.touchPadding = options.touchPadding ?? 8;
+    this.otherLabelText = options.otherLabel ?? "Other";
     this.presenter = new CenterPresenter(this.clock, () => this.invalidate());
     if (options.animation) this.animation = { ...this.animation, ...options.animation };
     if (options.style) this.currentStyle = applyStyle(this.currentStyle, options.style);
@@ -164,6 +168,18 @@ export class ChartModel {
     return this.allSlices[this.selectedIndexRaw] ?? null;
   }
 
+  /** Every slice on the ring, with its share of the whole: those in [slices], the group's included. */
+  get displayed(): readonly SelectedSlice[] {
+    return this.allSlices;
+  }
+
+  /** How many small slices are grouped (as the group's slice while it is closed, or on the ring while it is open); 0 with no group. */
+  get groupSize(): number {
+    if (this.expanded) return this.dataset.length - this.bandCount;
+    const last = this.dataset[this.dataset.length - 1];
+    return last?.id === OtherSliceId ? this.sourceData.length - (this.dataset.length - 1) : 0;
+  }
+
   /** The slices that a center renderer sees: those that can be selected. */
   get selectableSlices(): readonly SelectedSlice[] {
     return this.centerSlicesList;
@@ -194,6 +210,13 @@ export class ChartModel {
   /** Draws information about the selected slice in the hole; null (the default) draws nothing. */
   setCenterRenderer(renderer: CenterRenderer | null): void {
     this.renderer = renderer;
+    this.updateCenterAvailability();
+    this.invalidate();
+  }
+
+  /** Lays the center out again from scratch, for when what the renderer measures has changed, such as a font that has loaded. */
+  relayoutCenter(): void {
+    this.renderer?.invalidate?.();
     this.updateCenterAvailability();
     this.invalidate();
   }
@@ -249,6 +272,13 @@ export class ChartModel {
   setStyle(input: StyleInput): void {
     this.currentStyle = applyStyle(this.currentStyle, input);
     this.relayout();
+  }
+
+  /** Renames the slice that stands for the grouped small slices, in place. */
+  setOtherLabel(label: string): void {
+    if (label === this.otherLabelText) return;
+    this.otherLabelText = label;
+    this.syncGroups();
   }
 
   setAnimationConfig(config: Partial<AnimationConfig>): void {
@@ -310,6 +340,7 @@ export class ChartModel {
       gapDeg: this.currentStyle.visualGapDeg,
       expanded: this.expanded,
       otherColor: this.currentStyle.otherSliceColor,
+      otherLabel: this.otherLabelText,
     });
   }
 
@@ -449,14 +480,24 @@ export class ChartModel {
     if (this.isAnimating) return false;
     const index = this.sliceIndexAt(x, y);
     if (index < 0) return false;
-    const clicked = this.dataset[index]!;
+    this.activate(index);
+    return true;
+  }
+
+  /**
+   * What a tap on the slice at [index] of [slices] does: selects it, opens the group when it is the group's
+   * slice, closes the group when it is in the band. For the keyboard and screen readers, which act on a
+   * slice without a point; unlike a tap it is taken while the chart moves (a selection then waits for the end).
+   */
+  activate(index: number): void {
+    const clicked = this.dataset[index];
+    if (!clicked) return;
     if (clicked.id === OtherSliceId) this.expandGroup();
     else if (index < this.bandCount) this.collapseGroup();
     else {
       this.onSliceClick?.(clicked);
       this.setSelectedIndex(index);
     }
-    return true;
   }
 
   /** The index in the dataset of the slice under ([x], [y]), or -1. */

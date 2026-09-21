@@ -110,6 +110,13 @@ export class DefaultCenterRenderer implements CenterRenderer {
     this.formatter = formatter;
   }
 
+  invalidate(): void {
+    this.referenceSlices = null;
+    this.referenceArea = null;
+    this.laidOutSlice = null;
+    this.laidOutArea = null;
+  }
+
   fits(area: CenterArea, slices: readonly SelectedSlice[]): boolean {
     this.prepare(area, slices);
     return this.fitsAtMinimum;

@@ -25,6 +25,12 @@ export interface CenterRenderer {
    * This runs on every frame while the chart animates: return the same array again when nothing changed.
    */
   render(area: CenterArea, slice: SelectedSlice, slices: readonly SelectedSlice[]): readonly SvgNode[];
+
+  /**
+   * Forgets any layout it has kept, so that the next `fits` and `render` work from scratch. The chart calls it
+   * when something a renderer measures changes without its area or data changing, such as a font that has loaded.
+   */
+  invalidate?(): void;
 }
 
 /** When a [CenterRenderer] is shown. */

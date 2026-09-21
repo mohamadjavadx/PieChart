@@ -1,0 +1,131 @@
+name: Release web
+
+# Pushing a tag such as web-v0.1.0 checks and builds the web version, publishes it to npm, and creates a GitHub Release
+# with the package attached. (The Android release, release.yml, is for tags such as v2.0.0 and does not see these.)
+#
+# Before tagging: set `version` in web/package.json to the tag without the "web-v", and add a "## <version>" section to
+# web/CHANGELOG.md; its text becomes the release notes.
+#
+# Publishing needs the repository secret NPM_TOKEN (an npm automation token that may publish the package). Without it the
+# package is still built and attached to the release, and the publish step says that it was skipped. A version that is
+# on npm already is left alone, so a failed run can be started again. See docs/RELEASING.md.
+
+on:
+  push:
+    tags: ['web-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing tag to (re)release, e.g. web-v0.1.0
+        required: true
+
+permissions:
+  contents: write
+  id-token: write # for npm's provenance statement
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Check the tag against the package version and the changelog
+        id: version
+        run: |
+          VERSION="${TAG#web-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match the version $PKG_VERSION in web/package.json"
+            exit 1
+          fi
+          awk -v v="$VERSION" '$0 ~ "^## " v "( |$)" {p=1; next} /^## /{p=0} p' CHANGELOG.md > "$RUNNER_TEMP/changelog.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/changelog.md"; then
+            echo "::error::web/CHANGELOG.md has no '## $VERSION' section (or it is empty)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$(node -p "require('./package.json').name")" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+
+      - name: Types, tests, build, and a look at what will be published
+        run: npm run typecheck && npm test && npm run build && node tools/check-package.ts
+
+      - name: Pack
+        run: |
+          mkdir "$RUNNER_TEMP/pack"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/pack"
+          ls -l "$RUNNER_TEMP/pack"
+
+      - name: Publish to npm
+        id: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NAME: ${{ steps.version.outputs.name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::warning::The secret NPM_TOKEN is not set, so nothing was published to npm (see docs/RELEASING.md). The package is attached to the release."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          elif npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
+            echo "$NAME@$VERSION is on npm already, so it is left as it is."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            # A pre-release (a "-" in the version) goes to the "next" tag, so that installing without a version stays on the last real one.
+            DIST_TAG=latest
+            case "$VERSION" in *-*) DIST_TAG=next ;; esac
+            npm publish --provenance --access public --tag "$DIST_TAG"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.version.outputs.name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PUBLISHED: ${{ steps.npm.outputs.published }}
+        run: |
+          {
+            cat "$RUNNER_TEMP/changelog.md"
+            echo
+            echo "### Install"
+            echo
+            if [ "$PUBLISHED" = "true" ]; then
+              echo '```'
+              echo "npm install $NAME"
+              echo '```'
+            else
+              echo "It is not on npm yet. The package is attached to this release: \`npm install ./$(ls "$RUNNER_TEMP/pack" | head -n 1)\`."
+            fi
+            echo
+            echo "Use it as a web component (\`import \"$NAME/element/register\"\`, then \`<pie-chart>\`), as a React component (\`$NAME/react\`), or as a plain class (\`PieChart\`). See the [web README](https://github.com/$GITHUB_REPOSITORY/tree/$TAG/web#readme)."
+          } > "$RUNNER_TEMP/notes.md"
+
+          FLAGS="--latest=false" # the repository's "latest release" stays the Android library's
+          case "$VERSION" in *-*) FLAGS="$FLAGS --prerelease" ;; esac
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+            gh release upload "$TAG" "$RUNNER_TEMP/pack"/*.tgz --clobber
+          else
+            gh release create "$TAG" "$RUNNER_TEMP/pack"/*.tgz --title "PieChart for the web $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag $FLAGS
+          fi

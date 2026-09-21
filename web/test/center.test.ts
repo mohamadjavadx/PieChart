@@ -276,3 +276,19 @@ test("nothing selected fades out, and cancel jumps to where the fade was heading
   assert.equal(p.alpha, 1);
   assert.equal(p.displayed, A);
 });
+
+test("invalidate makes it measure again, as when a font has loaded", () => {
+  let width = 0.3;
+  const r = new DefaultCenterRenderer((t, size) => t.length * size * width);
+  const area = new CenterArea(100, 100, 40);
+  const slice = sliceOf(1, "Engineering", "50");
+  const slices = [slice];
+  assert.ok(r.fits(area, slices));
+  const before = r.render(area, slice, slices);
+  width = 1.2; // the real font is much wider than the one it was measured in
+  assert.equal(r.render(area, slice, slices), before, "nothing tells it that anything changed");
+  r.invalidate();
+  const after = r.render(area, slice, slices);
+  assert.notEqual(after, before);
+  assert.ok(Number(attrsOf(after[1]!)["font-size"]) < Number(attrsOf(before[1]!)["font-size"]), "the wider font gets a smaller size");
+});

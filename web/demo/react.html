@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PieChart for React</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fff; --ink: #2b3245; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --ink: #e8ecf5; } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
+    main { max-width: 420px; margin: 0 auto; padding: 16px; }
+    button { font: inherit; margin-right: 8px; }
+  </style>
+  <!-- React comes from a CDN here so that the page needs no bundler; in an app it is your own dependency. -->
+  <script type="importmap">
+    { "imports": {
+        "react": "https://esm.sh/react@19",
+        "react-dom/client": "https://esm.sh/react-dom@19/client?deps=react@19" } }
+  </script>
+</head>
+<body>
+<main id="root"></main>
+<script type="module">
+  import { createElement as h, useState, StrictMode, useRef } from "react";
+  import { createRoot } from "react-dom/client";
+  import { PieChart } from "../dist/react/index.js";
+
+  const SETS = [
+    [{ label: "Rent", value: 1200 }, { label: "Food", value: 450.5 }, { label: "Travel", value: 300 }, { label: "Fun", value: 120.25 }, { label: "Other stuff", value: 30 }],
+    [{ label: "Rent", value: 900 }, { label: "Food", value: 700 }, { label: "Travel", value: 100 }, { label: "Savings", value: 500 }],
+  ];
+
+  function App() {
+    const [set, setSet] = useState(0);
+    const [selected, setSelected] = useState(null);
+    const ref = useRef(null);
+    window.handle = ref;
+    return h("div", null,
+      h("h1", null, "PieChart for React"),
+      h(PieChart, {
+        ref, data: SETS[set].map((s) => ({ ...s })), // a new array on every render: equal data does not restart the animation
+        center: true, label: "Spending by category", chartStyle: { cornerRadiusDp: 4, visualGapDp: 4, groupSmallSlices: true },
+        onSelectionChange: (slice) => setSelected(slice ? slice.data.label : null),
+      }),
+      h("p", { id: "log" }, `selected: ${selected ?? "nothing"}`),
+      h("button", { id: "swap", onClick: () => setSet((set + 1) % SETS.length) }, "Change the data"),
+      h("button", { id: "rerender", onClick: () => setSelected((s) => s) }, "Re-render"));
+  }
+  createRoot(document.getElementById("root")).render(h(StrictMode, null, h(App)));
+</script>
+</body>
+</html>

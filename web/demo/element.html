@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>&lt;pie-chart&gt; element</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fff; --ink: #2b3245; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --ink: #e8ecf5; } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
+    main { max-width: 420px; margin: 0 auto; padding: 16px; }
+    pie-chart { --pie-chart-label-color: #8a93a6; }
+    output { display: block; text-align: center; min-height: 1.4em; color: #8a93a6; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>&lt;pie-chart&gt;</h1>
+  <pie-chart id="pie" center group-small-slices corner-radius-dp="4" gap-dp="4" shadow-offset-dp="6" label="Spending by category"
+    data='[{"label":"Rent","value":1200},{"label":"Food","value":450.5},{"label":"Travel","value":300},{"label":"Fun","value":120.25},{"label":"Other stuff","value":30}]'></pie-chart>
+  <output id="log">Tap a slice, or focus the chart and use the arrow keys</output>
+</main>
+<script type="module">
+  import "../dist/element/register.js";
+  const pie = document.getElementById("pie");
+  pie.addEventListener("selectionchange", (e) => { document.getElementById("log").textContent = e.detail ? `selected: ${e.detail.data.label}` : "nothing selected"; });
+  window.pie = pie;
+</script>
+</body>
+</html>

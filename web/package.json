@@ -1,21 +1,88 @@
 {
   "name": "@mohamadjavadx/piechart",
-  "version": "0.0.0",
-  "description": "An animated pie / donut chart for the web: the same look and features as the Android PieChart library.",
+  "version": "0.1.0",
+  "description": "An animated, accessible pie / donut chart for the web (SVG, no dependencies): a web component, a React component and a plain class. The same look and features as the Android PieChart library.",
+  "keywords": [
+    "pie chart",
+    "donut chart",
+    "chart",
+    "svg",
+    "animation",
+    "accessibility",
+    "a11y",
+    "web component",
+    "custom element",
+    "react",
+    "typescript"
+  ],
   "license": "Apache-2.0",
+  "author": "mohamadjavadx (https://github.com/mohamadjavadx)",
+  "homepage": "https://github.com/mohamadjavadx/PieChart/tree/main/web#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohamadjavadx/PieChart.git",
+    "directory": "web"
+  },
+  "bugs": {
+    "url": "https://github.com/mohamadjavadx/PieChart/issues"
+  },
   "type": "module",
-  "private": true,
-  "engines": {
-    "node": ">=22.18"
+  "sideEffects": [
+    "./dist/element/register.js"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./element": {
+      "types": "./dist/element/index.d.ts",
+      "default": "./dist/element/index.js"
+    },
+    "./element/register": {
+      "types": "./dist/element/register.d.ts",
+      "default": "./dist/element/register.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
-    "demo": "npm run build && node tools/serve.ts"
+    "build": "node tools/clean.ts && tsc -p tsconfig.build.json",
+    "verify": "npm run typecheck && npm test && npm run build && node tools/check-package.ts",
+    "bench": "node tools/bench.ts",
+    "demo": "npm run build && node tools/serve.ts",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.9.0"
   }
 }

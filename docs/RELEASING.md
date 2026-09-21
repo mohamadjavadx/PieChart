@@ -81,6 +81,50 @@ Then add these repository secrets (*Settings, Secrets and variables, Actions*): 
 just copied), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`piechart` above) and `ANDROID_KEY_PASSWORD`. The
 workflow uses them when `ANDROID_KEYSTORE_BASE64` exists. Do not commit the keystore.
 
+## The web version
+
+The web version (`web/`, the npm package `@mohamadjavadx/piechart`) is released on its own, with its own version and
+changelog, by `.github/workflows/web-release.yml`. Its tags are `web-v<version>`, which the Android workflow (tags `v*`) does
+not see. Every change to `web/` is also checked by `.github/workflows/web.yml`: types, tests, the build, and what would be
+published.
+
+### Check
+
+```
+cd web
+npm ci
+npm run verify      # types, tests, build, and a look at the tarball and the entry points
+npm pack --dry-run  # the files that would be published
+```
+
+### Set up once
+
+- The package name is the `name` in `web/package.json`. On npm, `@mohamadjavadx/...` is a scope, which has to belong to your
+  npm user or organization: create the organization (or change the name to a scope or a plain name you own) before the first
+  release.
+- Create an npm *automation* access token that can publish that package, and add it as the repository secret `NPM_TOKEN`
+  (*Settings, Secrets and variables, Actions*). Do not commit it. Without the secret a release still runs and attaches the
+  package to the GitHub Release, but publishes nothing to npm (the run says so). Once the package exists on npm you can
+  instead configure *trusted publishing* for this workflow in the package's settings on npmjs.com, and drop the token.
+
+### Release
+
+1. Set `version` in `web/package.json` (for example `0.2.0`) and add a `## 0.2.0` section to `web/CHANGELOG.md`; its text
+   becomes the release notes.
+2. Commit, then tag with `web-v` plus the version and push the tag:
+
+   ```
+   git tag web-v0.2.0 && git push origin web-v0.2.0
+   ```
+
+The workflow checks that the tag matches the version and that the changelog has a section for it; runs the types, tests and
+build and the check of the package; publishes to npm with a provenance statement (a version with a `-` in it, such as
+`0.2.0-rc.1`, goes to the `next` tag instead of `latest`, and its release is a pre-release); and creates the GitHub Release
+with the packed `.tgz` attached. The release is never marked *latest*, so the repository's latest release stays the Android
+library's. A version that is on npm already is left alone, so a failed run can be started again from the *Actions* tab
+(*Run workflow*, with the tag). npm does not let a published version be replaced: to fix a bad release, publish the next one
+(and `npm deprecate` the bad one).
+
 ## Other places to publish
 
 - **GitHub Packages:** add a Maven repository `https://maven.pkg.github.com/mohamadjavadx/PieChart` (user name plus a token with

@@ -1,6 +1,9 @@
 export * from "./core/index.ts";
 export * from "./center/index.ts";
+export * from "./a11y/items.ts";
+export { AccessibilityLayer } from "./a11y/layer.ts";
 export { ChartModel, type ChartModelOptions, type Padding, type SelectedSlice } from "./chart/model.ts";
+export { DEFAULT_PALETTE, normalizeData, sameData, type LooseSliceInput } from "./chart/input.ts";
 export { PieChart, type PieChartOptions } from "./chart/pieChart.ts";
 export { cubicBezier, DEFAULT_EASING, type Easing } from "./chart/easing.ts";
 export {
