@@ -84,8 +84,8 @@ class MainActivity : AppCompatActivity() {
 
     private var shownTab: SampleTab? = null
 
-    /** The chart's own alpha for slices that are not selected, read before any setting changes it. */
-    private var defaultUnselectedAlpha = 0
+    /** The chart's own dim for slices that are not selected, read before any setting changes it. */
+    private var defaultUnselectedDim = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The app is light only: dark mode must not change anything, not even the system bar icons.
@@ -152,7 +152,7 @@ class MainActivity : AppCompatActivity() {
 
         chartView = PieChartView(context).apply {
             setPadding(16.dp)
-            defaultUnselectedAlpha = unselectedAlpha
+            defaultUnselectedDim = unselectedDim
             // With small slices grouped, a tap on the group expands it into a ring of its own, next to
             // the big slices squeezed into an arc, dimmed. That is the chart's own look; only the color
             // of the group is the app's.
@@ -342,7 +342,7 @@ class MainActivity : AppCompatActivity() {
             visualGapDeg = style.gap.relativeValue,
             visualGapDp = style.gap.dpValue,
             groupSmallSlices = style.groupSmallSlices,
-            unselectedAlpha = if (style.dimsOtherSlices) defaultUnselectedAlpha else OPAQUE_ALPHA,
+            unselectedDim = if (style.dimsOtherSlices) defaultUnselectedDim else NOT_DIMMED,
         )
     }
 
@@ -363,7 +363,7 @@ class MainActivity : AppCompatActivity() {
         const val CHART_HEIGHT_TO_WIDTH = 0.7f
         const val TITLE_ROW_HEIGHT_DP = 36
         const val BACK_CHIP_HEIGHT_DP = 30
-        const val OPAQUE_ALPHA = 255
+        const val NOT_DIMMED = 0f
         const val MAX_RECYCLED_ROWS = 20
         const val WARMED_ROWS = 8
     }

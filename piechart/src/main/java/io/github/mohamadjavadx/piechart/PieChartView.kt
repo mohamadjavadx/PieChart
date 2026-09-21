@@ -38,6 +38,7 @@ import io.github.mohamadjavadx.piechart.geometry.sliceKey
 import io.github.mohamadjavadx.piechart.utils.dp
 import java.math.BigDecimal
 import java.math.MathContext
+import kotlin.math.roundToInt
 
 /**
  * A customizable Pie / Donut chart view.
@@ -55,7 +56,7 @@ import java.math.MathContext
  *   rounded corners.
  * - Supports [roundInnerCorners] to toggle between rounded or sharp inner corners.
  * - Supports tap selection of slices with a callback; the selected slice gets a soft shadow:
- *   a faded copy of the slice behind it, shifted toward the hole ([selectedShadowAlpha]).
+ *   a faded copy of the slice behind it, shifted toward the hole ([selectedShadowDim]).
  * - Can show information about the selected slice in the hole, drawn by a [CenterRenderer]
  *   (see [centerRenderer] and [CenterVisibility]).
  *
@@ -89,18 +90,21 @@ public class PieChartView(context: Context) : View(context) {
      * time the chart is laid out, and the ratio and degree properties hold the result. The limits
      * are those of the ratios.
      *
+     * The dim options ([selectedDim], [unselectedDim], [selectedShadowDim] and [mainSliceDim]) are all
+     * fractions from 0, not dimmed, to 1, invisible.
+     *
      * [groupSmallSlices] turns on the grouping of small slices, [otherSliceColor] is the color of the
-     * slice that stands for them, and [mainSliceDim] (0..1) is how much the big slices are dimmed
-     * while the group is expanded.
+     * slice that stands for them, and [mainSliceDim] is how much the big slices are dimmed while the
+     * group is expanded.
      */
     @MainThread
     public fun setStyle(
         visualGapDeg: Float? = null,
         visualGapDp: Float? = null,
         startAngleDeg: Float = this.startAngleDeg,
-        selectedAlpha: Int = this.selectedAlpha,
-        unselectedAlpha: Int = this.unselectedAlpha,
-        selectedShadowAlpha: Int = this.selectedShadowAlpha,
+        selectedDim: Float = this.selectedDim,
+        unselectedDim: Float = this.unselectedDim,
+        selectedShadowDim: Float = this.selectedShadowDim,
         selectedShadowOffsetRatio: Float? = null,
         selectedShadowOffsetDp: Float? = null,
         holeRadiusRatio: Float = this.holeRadiusRatio,
@@ -140,9 +144,9 @@ public class PieChartView(context: Context) : View(context) {
 
         startAngleDeg.finiteOrNull()?.let { this.startAngleDeg = it }
         holeRadiusRatio.finiteOrNull()?.let { this.holeRadiusRatio = it.coerceIn(0f, 1f) }
-        this.selectedAlpha = selectedAlpha.coerceIn(0, 255)
-        this.unselectedAlpha = unselectedAlpha.coerceIn(0, 255)
-        this.selectedShadowAlpha = selectedShadowAlpha.coerceIn(0, 255)
+        selectedDim.finiteOrNull()?.let { this.selectedDim = it.coerceIn(0f, 1f) }
+        unselectedDim.finiteOrNull()?.let { this.unselectedDim = it.coerceIn(0f, 1f) }
+        selectedShadowDim.finiteOrNull()?.let { this.selectedShadowDim = it.coerceIn(0f, 1f) }
         this.ensureRenderableSlices = ensureRenderableSlices
         this.roundInnerCorners = roundInnerCorners
         this.disabledColor = disabledColor
@@ -195,20 +199,24 @@ public class PieChartView(context: Context) : View(context) {
     public var startAngleDeg: Float = DEFAULT_START_ANGLE_DEG
         private set
 
-    /** Alpha used for the selected slice, and for every slice while nothing is selected (0..255). */
-    public var selectedAlpha: Int = DEFAULT_SELECTED_ALPHA
+    /**
+     * How much the selected slice, and every slice while nothing is selected, is dimmed: 0 not at
+     * all (the default), 1 until it is invisible. Every dim in the chart is such a fraction: a
+     * slice is drawn at 1 - dim of its opacity.
+     */
+    public var selectedDim: Float = DEFAULT_SELECTED_DIM
         private set
 
-    /** Alpha used for the slices that are not selected, while another slice is (0..255). */
-    public var unselectedAlpha: Int = DEFAULT_UNSELECTED_ALPHA
+    /** How much the slices that are not selected are dimmed, while another slice is (0..1). The default is 0.6. */
+    public var unselectedDim: Float = DEFAULT_UNSELECTED_DIM
         private set
 
     /**
-     * Alpha (0..255) of the selected slice's shadow: the slice's own shape and color drawn behind
-     * it, shifted toward the hole so that a small part of it shows. 0 turns the shadow off. The
-     * default is 20%.
+     * How much the selected slice's shadow is faded (0..1): the slice's own shape and color drawn
+     * behind it, shifted toward the hole so that a small part of it shows. 1 turns the shadow off.
+     * The default is 0.8, so a fifth of the color is left.
      */
-    public var selectedShadowAlpha: Int = DEFAULT_SELECTED_SHADOW_ALPHA
+    public var selectedShadowDim: Float = DEFAULT_SELECTED_SHADOW_DIM
         private set
 
     /**
@@ -1155,8 +1163,8 @@ public class PieChartView(context: Context) : View(context) {
         val innerSweep = (end - start - innerGapDeg) * fraction
         if (outerSweep <= 0f || innerSweep <= 0f) return
 
-        val selectionAlpha = if (selectedIndex < 0) selectedAlpha else unselectedAlpha
-        val alpha = (selectionAlpha * (1f - mainSliceDim * weight)).toInt()
+        val selectionDim = if (selectedIndex < 0) selectedDim else unselectedDim
+        val alpha = (255f * (1f - selectionDim) * (1f - mainSliceDim * weight)).roundToInt()
         if (alpha <= 0) return
 
         val checkpoint = canvas.saveLayerAlpha(
@@ -1190,12 +1198,16 @@ public class PieChartView(context: Context) : View(context) {
         canvas.restoreToCount(checkpoint)
     }
 
+    /** The paint alpha (0..255) of something dimmed by [dim] (0..1). */
+    private fun alphaOfDim(dim: Float): Int = ((1f - dim) * 255f).roundToInt().coerceIn(0, 255)
+
     private fun configureSlicePaint(renderIndex: Int) {
         slicePaint.color = renderList[renderIndex].color
         val datasetIndex = renderIndexMap[renderIndex]
         // Nothing selected: every slice is drawn normally, not as "unselected".
-        slicePaint.alpha =
-            if (selectedIndex < 0 || datasetIndex == selectedIndex) selectedAlpha else unselectedAlpha
+        slicePaint.alpha = alphaOfDim(
+            if (selectedIndex < 0 || datasetIndex == selectedIndex) selectedDim else unselectedDim
+        )
     }
 
     private fun drawDonutSlice(
@@ -1214,10 +1226,10 @@ public class PieChartView(context: Context) : View(context) {
         // The selected slice's shadow: the same slice, in a faded color, drawn behind it and
         // shifted toward the hole. It follows the slice through every animation.
         val hasShadow = selectedIndex >= 0 && renderIndexMap[index] == selectedIndex &&
-            selectedShadowAlpha > 0 && shadowRing.outerRadius < sliceRing.outerRadius
+            selectedShadowDim < 1f && shadowRing.outerRadius < sliceRing.outerRadius
         if (hasShadow) {
             val sliceAlpha = slicePaint.alpha
-            slicePaint.alpha = selectedShadowAlpha
+            slicePaint.alpha = alphaOfDim(selectedShadowDim)
             drawRoundedDonutSlice(canvas, shadowRing, outerStartAngle, outerSweep, innerStartAngle, innerSweep)
             slicePaint.alpha = sliceAlpha
         }
@@ -1332,9 +1344,9 @@ public class PieChartView(context: Context) : View(context) {
         // Default style values
         private const val DEFAULT_VISUAL_GAP_DEG = 1f
         private const val DEFAULT_START_ANGLE_DEG = -90f
-        private const val DEFAULT_SELECTED_ALPHA = 255
-        private const val DEFAULT_UNSELECTED_ALPHA = 102
-        private const val DEFAULT_SELECTED_SHADOW_ALPHA = 51 // 20% of 255
+        private const val DEFAULT_SELECTED_DIM = 0f
+        private const val DEFAULT_UNSELECTED_DIM = 0.6f
+        private const val DEFAULT_SELECTED_SHADOW_DIM = 0.8f
         private const val DEFAULT_SELECTED_SHADOW_OFFSET_RATIO = 0.06f
         private const val DEFAULT_HOLE_RADIUS_RATIO = 0.85f
         private const val DEFAULT_CORNER_RADIUS_RATIO = 0.5f
@@ -1343,7 +1355,7 @@ public class PieChartView(context: Context) : View(context) {
         private const val DEFAULT_DISABLED_COLOR: Int = Color.LTGRAY
         private const val DEFAULT_GROUP_SMALL_SLICES = false
         private const val DEFAULT_OTHER_SLICE_COLOR: Int = 0xFF8A93A6.toInt()
-        private const val DEFAULT_MAIN_SLICE_DIM = 0.7f
+        private const val DEFAULT_MAIN_SLICE_DIM = 0.6f
 
         /** How far a slice of the band is drawn over the next one, in degrees. */
         private const val BAND_SEAM_OVERLAP_DEG = 0.15f
