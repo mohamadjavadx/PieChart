@@ -8,7 +8,10 @@ import {
 } from "../core/sliceMath.ts";
 import { shareOf, toSlices, totalOf } from "../core/slices.ts";
 import { OtherSliceId, type Slice, type SliceInput } from "../core/types.ts";
-import { buildScene, type FrameState, type Scene } from "./scene.ts";
+import { CenterArea } from "../center/area.ts";
+import { CenterPresenter } from "../center/presenter.ts";
+import type { CenterRenderer, CenterVisibility } from "../center/renderer.ts";
+import { buildScene, type FrameState, type Scene, type SceneCenter } from "./scene.ts";
 import {
   applyStyle, DEFAULT_ANIMATION, DEFAULT_STYLE, type AnimationConfig, type ChartStyle, type StyleInput,
 } from "./style.ts";
@@ -117,10 +120,18 @@ export class ChartModel {
   private allSlices: SelectedSlice[] = [];
   private centerSlicesList: SelectedSlice[] = [];
 
+  // The details of the selected slice, in the hole.
+  private renderer: CenterRenderer | null = null;
+  private visibility: CenterVisibility = "whenFits";
+  private area = new CenterArea(0, 0, 0);
+  private isCenterAvailable = false;
+  private readonly presenter: CenterPresenter;
+
   constructor(options: ChartModelOptions = {}) {
     this.clock = options.clock ?? (() => performance.now());
     this.density = options.density ?? 1;
     this.touchPadding = options.touchPadding ?? 8;
+    this.presenter = new CenterPresenter(this.clock, () => this.invalidate());
     if (options.animation) this.animation = { ...this.animation, ...options.animation };
     if (options.style) this.currentStyle = applyStyle(this.currentStyle, options.style);
   }
@@ -162,9 +173,66 @@ export class ChartModel {
     return this.morphAnimation !== null || this.revealAnimation !== null;
   }
 
-  /** The hole, for content that is placed over the chart. */
-  get hole(): { readonly cx: number; readonly cy: number; readonly radius: number } {
-    return { cx: this.ring.cx, cy: this.ring.cy, radius: this.ring.innerRadius };
+  /**
+   * The hole, for content that is placed over the chart. It is a new instance only when the hole changes,
+   * so a renderer that caches by identity keeps its work when only another style setting changes.
+   */
+  get centerArea(): CenterArea {
+    return this.area;
+  }
+
+  get centerRenderer(): CenterRenderer | null {
+    return this.renderer;
+  }
+
+  get centerVisibility(): CenterVisibility {
+    return this.visibility;
+  }
+
+  // ------------------------------------------------------------------ The center
+
+  /** Draws information about the selected slice in the hole; null (the default) draws nothing. */
+  setCenterRenderer(renderer: CenterRenderer | null): void {
+    this.renderer = renderer;
+    this.updateCenterAvailability();
+    this.invalidate();
+  }
+
+  /** When the renderer is shown. By default only while it fits in the hole. */
+  setCenterVisibility(visibility: CenterVisibility): void {
+    this.visibility = visibility;
+    this.updateCenterAvailability();
+  }
+
+  /** Whether the center is shown is worked out when the size, the hole or the data change, not per selection. */
+  private updateCenterAvailability(): void {
+    this.isCenterAvailable = this.computeCenterAvailability();
+    this.refreshCenter();
+  }
+
+  private refreshCenter(): void {
+    this.presenter.update(this.selection, this.isCenterAvailable);
+  }
+
+  private computeCenterAvailability(): boolean {
+    const renderer = this.renderer;
+    if (!renderer || this.area.isEmpty || this.centerSlicesList.length === 0) return false;
+    const visibility = this.visibility;
+    if (visibility === "always") return true;
+    if (visibility === "never") return false;
+    if (visibility === "whenFits") return renderer.fits ? renderer.fits(this.area, this.centerSlicesList) : true;
+    return this.currentStyle.holeRadiusRatio >= visibility.minHoleRatio;
+  }
+
+  /**
+   * The area is a new instance only when the hole changes, as [centerArea] promises, so a renderer that
+   * caches by identity keeps its work when only the style changes elsewhere.
+   */
+  private updateCenterArea(cx: number, cy: number, radius: number): void {
+    const area = this.area;
+    if (area.cx === cx && area.cy === cy && area.radius === radius) return;
+    this.area = new CenterArea(cx, cy, radius);
+    this.updateCenterAvailability();
   }
 
   // ------------------------------------------------------------------ Size and style
@@ -299,6 +367,7 @@ export class ChartModel {
     this.selectedIndexRaw = keptKey === undefined ? -1 : clean.findIndex((slice) => sliceKey(slice) === keptKey);
     // A slice that is in the band can not be selected: the selection ends when its slice goes there.
     if (this.selectedIndexRaw >= 0 && this.selectedIndexRaw < newBandCount) this.selectedIndexRaw = -1;
+    this.updateCenterAvailability();
     // Not a change of selection when the same slice stays selected, whatever its index or value.
     const nowSelected = clean[this.selectedIndexRaw];
     if ((nowSelected ? sliceKey(nowSelected) : undefined) !== previousKey) this.onSelectionChanged?.(this.selection);
@@ -317,6 +386,7 @@ export class ChartModel {
     this.pendingSelectedIndex = null;
     this.resetSegments();
     this.rebuildSlices();
+    this.updateCenterAvailability();
     this.invalidate();
   }
 
@@ -345,6 +415,7 @@ export class ChartModel {
   private setSelected(index: number): void {
     if (this.selectedIndexRaw === index) return;
     this.selectedIndexRaw = index;
+    this.refreshCenter();
     this.onSelectionChanged?.(this.selection);
   }
 
@@ -403,13 +474,14 @@ export class ChartModel {
 
   /** Moves the animations to [now] (ms). True while any is still running: call again next frame. */
   advance(now: number): boolean {
+    const fading = this.presenter.advance(now);
     for (const animation of [this.revealAnimation, this.morphAnimation]) {
       if (!animation) continue;
       const progress = animation.duration <= 0 ? 1 : Math.min(Math.max((now - animation.startedAt) / animation.duration, 0), 1);
       animation.update(animation.easing(progress));
       if (progress >= 1 && (animation === this.revealAnimation || animation === this.morphAnimation)) animation.end();
     }
-    return this.isAnimating;
+    return this.isAnimating || fading || this.presenter.isFading;
   }
 
   /** Entry animation: every slice grows from its start angle to its full sweep, all at once. */
@@ -556,6 +628,7 @@ export class ChartModel {
       this.shadowRing = this.ring;
       this.innerTouchBound = 1;
       this.outerTouchBound = 0;
+      this.updateCenterArea(this.cx, this.cy, 0);
       return;
     }
 
@@ -579,6 +652,7 @@ export class ChartModel {
     this.shadowRing = shadowRingOf(this.ring, style.selectedShadowOffsetRatio);
     this.innerTouchBound = innerRadius - this.touchPadding;
     this.outerTouchBound = outerRadius + this.touchPadding;
+    this.updateCenterArea(this.cx, this.cy, innerRadius);
   }
 
   private precomputeSegments(): void {
@@ -639,6 +713,15 @@ export class ChartModel {
 
   // ------------------------------------------------------------------ Drawing
 
+  /** The details of the selected slice, while there are any to show. */
+  private centerScene(): SceneCenter | null {
+    const renderer = this.renderer;
+    const slice = this.presenter.displayed;
+    const alpha = this.presenter.alpha;
+    if (!renderer || !slice || alpha <= 0 || this.area.isEmpty) return null;
+    return { opacity: alpha, nodes: renderer.render(this.area, slice, this.centerSlicesList) };
+  }
+
   /** What to draw now. */
   frame(): FrameState {
     return {
@@ -646,6 +729,7 @@ export class ChartModel {
       hasData: this.dataset.length > 0, renderList: this.renderList, renderIndexMap: this.renderIndexMap,
       fullSweeps: this.fullSweeps, animatedFractions: this.animatedFractions, bandWeights: this.bandWeights,
       gapDeg: this.gapDeg, innerGapDeg: this.innerGapDeg, selectedIndex: this.selectedIndexRaw,
+      center: this.centerScene(),
     };
   }
 

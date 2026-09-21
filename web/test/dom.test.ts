@@ -8,6 +8,7 @@ import type { SvgNode } from "../src/svg/nodes.ts";
 class FakeElement {
   readonly localName: string;
   readonly childNodes: FakeElement[] = [];
+  textContent: string | null = "";
   private readonly values = new Map<string, string>();
   operations: string[] = [];
   constructor(tag: string) {
@@ -86,4 +87,19 @@ test("numbers become text, and an equal number is not set again", () => {
   assert.deepEqual(child.operations, []);
   patchChildren(asElement(svg), [path("M0", { opacity: 0.25 })]);
   assert.deepEqual(child.operations, ["set opacity"]);
+});
+
+test("the text of a text element is set, and only when it changed", () => {
+  const svg = root();
+  const text = (t: string): SvgNode => ({ tag: "text", text: t, attrs: { x: 1 } });
+  patchChildren(asElement(svg), [text("Engineering")]);
+  assert.equal(svg.childNodes[0]!.textContent, "Engineering");
+  const child = svg.childNodes[0]!;
+  child.operations = [];
+  let writes = 0;
+  Object.defineProperty(child, "textContent", { get: () => "Engineering", set: () => { writes++; } });
+  patchChildren(asElement(svg), [text("Engineering")]);
+  assert.equal(writes, 0, "the same text is not written again");
+  patchChildren(asElement(svg), [text("Product")]);
+  assert.equal(writes, 1);
 });

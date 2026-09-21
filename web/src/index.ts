@@ -1,4 +1,5 @@
 export * from "./core/index.ts";
+export * from "./center/index.ts";
 export { ChartModel, type ChartModelOptions, type Padding, type SelectedSlice } from "./chart/model.ts";
 export { PieChart, type PieChartOptions } from "./chart/pieChart.ts";
 export { cubicBezier, DEFAULT_EASING, type Easing } from "./chart/easing.ts";

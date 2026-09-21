@@ -11,8 +11,6 @@
     main { max-width: 420px; margin: 0 auto; padding: 16px; }
     h1 { font-size: 18px; margin: 4px 0 12px; }
     #chart { height: 340px; }
-    #readout { text-align: center; min-height: 3em; color: var(--muted); }
-    #readout b { color: var(--ink); font-size: 20px; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
     .row output { color: var(--accent); font-weight: 600; margin-left: 6px; }
     input[type=range] { width: 55%; accent-color: var(--accent); }
@@ -25,7 +23,6 @@
 <main>
   <h1>Pie Chart <button id="back">Back to all slices</button></h1>
   <div id="chart"></div>
-  <div id="readout">Tap a slice</div>
 
   <div class="row"><span>Number of Segments <output id="count-out">5</output></span>
     <span class="stepper"><button id="minus">−</button><button id="plus">+</button></span></div>
@@ -37,7 +34,7 @@
 </main>
 
 <script type="module">
-  import { PieChart, Decimal } from "../dist/index.js";
+  import { PieChart, Decimal, createDefaultCenter } from "../dist/index.js";
 
   const PALETTE = ["#F24822", "#FF9E42", "#FFC943", "#A8D94F", "#2EA659", "#B485B8", "#A55EEA", "#FFB6A2", "#336314", "#5AD8CC",
     "#3373E5", "#C8B222", "#8C6640", "#D94099", "#3DADFF", "#DEBAF6", "#4247A6", "#D77C63", "#9D486B", "#49A9AE",
@@ -51,7 +48,11 @@
   });
 
   const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  /** The text in the hole, in the page's colors (a fill can't take a CSS variable, so they are read here). */
+  const center = () => createDefaultCenter({ labelColor: css("--muted"), valueColor: css("--ink"), suffixColor: css("--ink") });
   const chart = new PieChart($("chart"), {
+    center: center(),
     padding: 16,
     style: { cornerRadiusDp: 4, visualGapDp: 4, selectedShadowOffsetDp: 6, groupSmallSlices: true, unselectedDim: 0 },
   });
@@ -62,9 +63,7 @@
   show();
   chart.setSelectedIndex(0);
 
-  chart.model.onSelectionChanged = (s) => {
-    $("readout").innerHTML = s ? `${s.data.label}<br><b>${s.data.value.toString()}</b> / ${s.total.toString()}` : "Tap a slice";
-  };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => chart.model.setCenterRenderer(center()));
   chart.model.onGroupExpandedChanged = (open) => { $("back").style.display = open ? "inline-block" : "none"; };
   $("back").onclick = () => chart.collapseGroup();
 

@@ -1,16 +1,11 @@
 import type { OutlinePath } from "../core/ringPath.ts";
 import type { Scene } from "../chart/scene.ts";
+import type { SvgNode } from "./node.ts";
+
+export type { SvgAttributes, SvgNode } from "./node.ts";
 
 // A scene as a tree of SVG elements: plain data, so that it can be written as text (for a server, a test
 // or a file) and also patched into the DOM (see dom.ts) with the same result.
-
-export type SvgAttributes = Readonly<Record<string, string | number>>;
-
-export interface SvgNode {
-  readonly tag: "svg" | "defs" | "mask" | "g" | "path";
-  readonly attrs: SvgAttributes;
-  readonly children?: readonly SvgNode[];
-}
 
 export interface SvgOptions {
   /** Makes the ids inside the SVG (of the band's mask) unique on a page that has several charts. */
@@ -48,6 +43,15 @@ export function sceneToNodes(scene: Scene, options: SvgOptions = {}): SvgNode {
     });
   }
 
+  // What is in the hole, on top of everything, faded as a whole.
+  if (scene.center && scene.center.nodes.length > 0) {
+    children.push({
+      tag: "g",
+      attrs: scene.center.opacity < 1 ? { opacity: number(scene.center.opacity) } : {},
+      children: scene.center.nodes,
+    });
+  }
+
   return {
     tag: "svg",
     attrs: {
@@ -78,9 +82,12 @@ const number = (value: number): string => String(Number(value.toFixed(4)));
 const escapeAttribute = (value: string | number): string =>
   String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
+const escapeText = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
 /** [node] as SVG text. */
 export function nodeToString(node: SvgNode): string {
   const attrs = Object.entries(node.attrs).map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`).join("");
+  if (node.text !== undefined) return `<${node.tag}${attrs}>${escapeText(node.text)}</${node.tag}>`;
   if (!node.children || node.children.length === 0) return `<${node.tag}${attrs}/>`;
   return `<${node.tag}${attrs}>${node.children.map(nodeToString).join("")}</${node.tag}>`;
 }

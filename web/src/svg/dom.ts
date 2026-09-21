@@ -1,4 +1,4 @@
-import type { SvgNode } from "./nodes.ts";
+import type { SvgNode } from "./node.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -16,7 +16,7 @@ export function patchChildren(element: Element, nodes: readonly SvgNode[]): void
       element.appendChild(create(node));
     } else if (current.localName === node.tag) {
       patchAttributes(current, node.attrs);
-      patchChildren(current, node.children ?? []);
+      patchContent(current, node);
     } else {
       element.replaceChild(create(node), current);
     }
@@ -27,12 +27,21 @@ export function patchChildren(element: Element, nodes: readonly SvgNode[]): void
 /** Makes [element] show [root]: its attributes and its children. */
 export function patchElement(element: Element, root: SvgNode): void {
   patchAttributes(element, root.attrs);
-  patchChildren(element, root.children ?? []);
+  patchContent(element, root);
+}
+
+function patchContent(element: Element, node: SvgNode): void {
+  if (node.text !== undefined) {
+    if (element.textContent !== node.text) element.textContent = node.text;
+  } else {
+    patchChildren(element, node.children ?? []);
+  }
 }
 
 function create(node: SvgNode): Element {
   const element = document.createElementNS(SVG_NS, node.tag);
   for (const [name, value] of Object.entries(node.attrs)) element.setAttribute(name, String(value));
+  if (node.text !== undefined) element.textContent = node.text;
   for (const child of node.children ?? []) element.appendChild(create(child));
   return element;
 }

@@ -5,12 +5,12 @@ SVG. It is being built in steps.
 
 | | |
 |---|---|
-| Done | **The core** (`src/core`): exact decimals, sweeps and gaps, corner radii, small-slice grouping, the morph planner, hit testing, SVG paths. **The chart** (`src/chart`): its state, selection, group expand and collapse, reveal and morph animations. **SVG** (`src/svg`): a scene as SVG text or patched into the DOM. `PieChart` puts it on a page. |
-| Next | The text in the hole (the center renderer and its fade), a `<pie-chart>` web component, a React wrapper, and accessibility (keyboard and screen readers). |
+| Done | **The core** (`src/core`): exact decimals, sweeps and gaps, corner radii, small-slice grouping, the morph planner, hit testing, SVG paths. **The chart** (`src/chart`): its state, selection, group expand and collapse, reveal and morph animations. **SVG** (`src/svg`): a scene as SVG text or patched into the DOM. `PieChart` puts it on a page. **The text in the hole** (`src/center`): the selected slice's label, value and total, scaled to fit, faded when the selection changes. |
+| Next | A `<pie-chart>` web component, a React wrapper, and accessibility (keyboard and screen readers). |
 
 ```
 npm run demo        # builds, and serves a demo page on http://localhost:8765/
-npm test            # node --test: 115 tests, no packages needed
+npm test            # node --test: 144 tests, no packages needed
 npm install         # once, for the type checker
 npm run typecheck   # tsc --noEmit, strict, tests included
 npm run build       # ES modules and .d.ts into dist/
@@ -21,10 +21,11 @@ Node 22.18 or newer. The source uses only syntax that Node can run as it is, so 
 ## Using it
 
 ```ts
-import { PieChart } from "./dist/index.js";
+import { PieChart, createDefaultCenter } from "./dist/index.js";
 
 const chart = new PieChart(document.querySelector("#chart")!, {
   padding: 16,
+  center: createDefaultCenter(), // the selected slice's label, value and total, in the hole
   style: { cornerRadiusDp: 4, visualGapDp: 4, groupSmallSlices: true },
 });
 chart.setData([
@@ -36,7 +37,18 @@ chart.model.onSelectionChanged = (slice) => console.log(slice?.data.label);
 
 The options, their defaults, and the behavior are those of the Android library, in dp (CSS px here) and with `…Dim`
 options from 0 to 1: see the Android README's [Styling](../README.md#styling) and [Small slices](../README.md#small-slices).
-Data given before the container has a size waits for it, so the entry animation is not played unseen.
+Data given before the container has a size waits for it (and so does a selection made meanwhile), so the entry animation is
+not played unseen.
+
+### The text in the hole
+
+`createDefaultCenter(style?, formatter?)` draws what the Android `DefaultCenterRenderer` draws: a small label over a large
+value, and the total after it (`50/100`), all scaled down together in a small hole, and gone when they would not fit
+(`centerVisibility`: `"whenFits"` by default, `"always"`, `"never"`, or `{ minHoleRatio }`). A change of selection fades the
+old text out and the new one in. `formatter` picks the text (`(slice) => ({ label, value, suffix })`); `style` the colors,
+font, sizes and gaps. A fill can't take a CSS variable, so give colors as values, and set a new renderer with
+`chart.model.setCenterRenderer(...)` when the theme changes (the demo does). To draw something else, implement
+`CenterRenderer` (`render(area, slice, slices)` returns SVG nodes, and an optional `fits`).
 
 ## Layers
 
@@ -45,6 +57,7 @@ Data given before the container has a size waits for it, so the entry animation 
 | `src/core` | A port, function by function, of the Android library's pure Kotlin code (`SliceMath`, `Grouping`, `Morph`, `RingPathBuilder`), and `Decimal`, exact decimals with Java's `DECIMAL64` division. Nothing here touches the DOM. |
 | `src/chart/model.ts` | `ChartModel`, the port of `PieChartView`'s state machine: data, selection, grouping, animations. Time comes in through `advance(now)`, so it runs (and is tested) without a browser. |
 | `src/chart/scene.ts` | What to draw for one frame: shapes in paint order, with colors and opacities. The port of the view's drawing, with the canvas taken out. |
+| `src/center` | The text in the hole: the area it may use, the renderer that fits and lays out text (measured through a `TextMeasurer`: a canvas in a browser, a function in tests), and the presenter that fades it. |
 | `src/svg` | A scene as a tree of SVG elements: written as text (`sceneToSvg`, also for a server) or patched into the DOM (`patchChildren`), which keeps elements and sets only what changed. |
 | `src/chart/pieChart.ts` | `PieChart`: an SVG in an element that follows its size, runs the animation loop and turns pointer events into taps. |
 
@@ -81,4 +94,8 @@ Three checks, from the cheapest to the most convincing:
   not an ARGB int.
 - Ids are compared with `===` and can be strings, numbers or symbols; the group's slice has the id `OtherSliceId` (a symbol).
 - The group's label is a parameter (`otherLabel`) instead of a fixed English word.
-- "dp" is a CSS px.
+- "dp" is a CSS px, and so are the text sizes (Android's are in sp).
+- The text in the hole is set in `Roboto, system-ui, …` and measured with a canvas, so it needs the font to be loaded before the
+  chart is given data (or `setCenterRenderer` called again after): a font that arrives later changes the width of the text
+  and would not be measured again. On Android's own screenshots, the label and value baselines land within 1 px of the web
+  chart's at the same size; the shapes of the letters differ where the fonts do.

@@ -1,6 +1,7 @@
 import { outlineOf, slicePath, type OutlineOptions } from "../core/layout.ts";
 import { fullRingPath, sharpSlicePath, type OutlinePath, type Ring } from "../core/ringPath.ts";
 import type { Slice } from "../core/types.ts";
+import type { SvgNode } from "../svg/node.ts";
 import type { ChartStyle } from "./style.ts";
 
 // What to draw for one frame of the chart: shapes, in the order they are painted, with their colors and
@@ -25,6 +26,13 @@ export interface SceneBand {
   readonly sectors: readonly { readonly color: string; readonly opacity: number; readonly path: OutlinePath }[];
 }
 
+/** What is drawn in the hole: SVG elements, faded as a whole. */
+export interface SceneCenter {
+  /** 0..1 */
+  readonly opacity: number;
+  readonly nodes: readonly SvgNode[];
+}
+
 export interface Scene {
   readonly width: number;
   readonly height: number;
@@ -33,6 +41,8 @@ export interface Scene {
   readonly band: SceneBand | null;
   /** The empty ring, when there is no data. */
   readonly placeholder: { readonly color: string; readonly path: OutlinePath } | null;
+  /** The selected slice's details, over everything else. */
+  readonly center: SceneCenter | null;
 }
 
 /** Everything that [buildScene] needs to know about the chart at one moment. */
@@ -56,6 +66,7 @@ export interface FrameState {
   readonly innerGapDeg: number;
   /** The selected slice's index in the dataset, or -1. */
   readonly selectedIndex: number;
+  readonly center: SceneCenter | null;
 }
 
 /** How far a slice of the band is drawn over the next one, in degrees, so that no seam of the background shows. */
@@ -66,10 +77,10 @@ export const alphaOfDim = (dim: number): number => Math.min(Math.max(Math.round(
 
 export function buildScene(frame: FrameState): Scene {
   const { width, height, style } = frame;
-  if (frame.ring.outerRadius <= 0) return { width, height, slices: [], band: null, placeholder: null };
+  if (frame.ring.outerRadius <= 0) return { width, height, slices: [], band: null, placeholder: null, center: null };
   if (!frame.hasData) {
     return {
-      width, height, slices: [], band: null,
+      width, height, slices: [], band: null, center: null,
       placeholder: { color: style.disabledColor, path: fullRingPath(frame.ring) },
     };
   }
@@ -128,7 +139,7 @@ export function buildScene(frame: FrameState): Scene {
   }
 
   const band = bandFirst >= 0 ? buildBand(frame, outline, bandFirst, bandLast, bandStart) : null;
-  return { width, height, slices, band, placeholder: null };
+  return { width, height, slices, band, placeholder: null, center: frame.center };
 }
 
 /** The slices [first]..[last] of the band of an expanded group, from angle [start]. */

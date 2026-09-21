@@ -1,4 +1,5 @@
 import { ChartModel, type ChartModelOptions, type Padding, type SelectedSlice } from "./model.ts";
+import type { CenterRenderer, CenterVisibility } from "../center/renderer.ts";
 import type { StyleInput } from "./style.ts";
 import { patchChildren } from "../svg/dom.ts";
 import { sceneToNodes } from "../svg/nodes.ts";
@@ -7,6 +8,10 @@ import type { Slice, SliceInput } from "../core/types.ts";
 export interface PieChartOptions extends ChartModelOptions {
   /** The space around the ring, in px. */
   padding?: Padding | number;
+  /** Draws the selected slice's details in the hole; see `createDefaultCenter`. Nothing is drawn by default. */
+  center?: CenterRenderer | null;
+  /** When the center is shown; by default only while it fits. */
+  centerVisibility?: CenterVisibility;
 }
 
 /** How far a pointer may move between going down and up for it to still be a tap, in px. */
@@ -33,6 +38,7 @@ export class PieChart {
   private frameRequest = 0;
   private measured = false;
   private pendingData: readonly SliceInput[] | null = null;
+  private pendingSelection: number | null = null;
   private down: { id: number; x: number; y: number } | null = null;
 
   constructor(container: HTMLElement, options: PieChartOptions = {}) {
@@ -40,6 +46,8 @@ export class PieChart {
     this.padding = options.padding ?? 0;
     this.model = new ChartModel(options);
     this.model.onInvalidate = () => this.requestFrame();
+    if (options.centerVisibility) this.model.setCenterVisibility(options.centerVisibility);
+    if (options.center) this.model.setCenterRenderer(options.center);
 
     this.element = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.element.style.display = "block";
@@ -75,6 +83,7 @@ export class PieChart {
 
   clearData(): void {
     this.pendingData = null;
+    this.pendingSelection = null;
     this.model.clearData();
   }
 
@@ -91,7 +100,9 @@ export class PieChart {
   }
 
   setSelectedIndex(index: number): void {
-    this.model.setSelectedIndex(index);
+    // Data that waits for the first measurement has nothing to select yet: the selection waits with it.
+    if (this.pendingData) this.pendingSelection = index;
+    else this.model.setSelectedIndex(index);
   }
 
   get selection(): SelectedSlice | null {
@@ -121,6 +132,8 @@ export class PieChart {
         const data = this.pendingData;
         this.pendingData = null;
         this.model.setData(data);
+        if (this.pendingSelection !== null) this.model.setSelectedIndex(this.pendingSelection);
+        this.pendingSelection = null;
       }
     }
     this.requestFrame();
