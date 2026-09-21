@@ -49,6 +49,23 @@ If a run fails, fix the cause and start the workflow again from the *Actions* ta
 the release if it already exists. If the fix has to change the tagged commit, move the tag first:
 `git tag -f v1.1.0 && git push -f origin v1.1.0`.
 
+### Refreshing the demo app of a release
+
+A fix to the demo app does not need a new version. `.github/workflows/demo.yml` rebuilds only the demo, from any branch,
+tag or commit, and swaps it into a release that already exists:
+
+1. Push the commit with the fix to `main` (the workflow is run from there, so its file has to be on the branch).
+2. Open *Actions*, choose *Refresh demo app*, press *Run workflow*, and give the release's tag (for example `v2.0.0`)
+   and, when it is not `main`, the branch, tag or commit to build from.
+
+It replaces `PieChart-demo-<version>.apk` and its `-mapping.txt`, and writes the *Demo app* section of the release notes
+again, saying which commit the demo was built from. The tag, the library files and the rest of the notes stay as they are.
+
+The demo is versioned with the library, so the library version at the chosen ref has to be the release's; the run stops
+with an error otherwise, for example when `main` has moved on to the next version (then build from the release's tag, or
+from a branch that is still at that version). It uses the same signing secrets as a release: without them the APK is
+signed with the throw-away debug key, so anyone who installed the earlier one has to uninstall it first.
+
 ### Signing the demo APK
 
 Without any setup the demo APK is signed with the throw-away debug key of the CI machine, which is different on every run:

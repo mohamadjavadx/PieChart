@@ -1,0 +1,131 @@
+name: Refresh demo app
+
+# Rebuilds only the demo app, from any branch, tag or commit, and swaps it (with its R8 mapping file) into a
+# release that already exists. The tag, the library files and the rest of the release notes stay as they are, so a
+# fix to the demo does not need a new version. See docs/RELEASING.md.
+#
+# Run it by hand: Actions, "Refresh demo app", "Run workflow" (from main), with the release's tag, e.g. v2.0.0.
+# The demo is versioned with the library, so the library version at the chosen ref has to be the release's.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release whose demo app to replace, e.g. v2.0.0
+        required: true
+      ref:
+        description: Branch, tag or commit to build the demo from
+        required: false
+        default: main
+
+permissions:
+  contents: write
+
+# The same group as release.yml uses for a tag, so the two never change one release at the same time.
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag }}
+  REF: ${{ inputs.ref }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that the release exists
+        run: |
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::There is no release for $TAG. Publish it first (see docs/RELEASING.md); this workflow only replaces the demo app of one that exists."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check the release against the demo's version
+        id: version
+        run: |
+          VERSION="${TAG#v}"
+          LIB_VERSION="$(./gradlew -q :piechart:properties | awk '/^version:/ {print $2}')"
+          if [ "$LIB_VERSION" != "$VERSION" ]; then
+            echo "::error::$REF has library version $LIB_VERSION, and the demo is versioned with the library, so it can only refresh the release of that version, not $TAG."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # The same as in release.yml: a release key when the secrets exist, else the throw-away debug key.
+      - name: Signing key for the demo app (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            {
+              echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore"
+              echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "RELEASE_KEY_ALIAS=$KEY_ALIAS"
+              echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+              echo "APK_SIGNING=release key"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing secrets are set, so the demo APK is signed with a throw-away debug key (see docs/RELEASING.md)."
+            echo "APK_SIGNING=debug key" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the demo app
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Collect the files to attach
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/PieChart-demo-$VERSION.apk"
+          cp app/build/outputs/mapping/release/mapping.txt "dist/PieChart-demo-$VERSION-mapping.txt"
+          ls -l dist
+
+      - name: Replace the demo app in the release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          SHORT="$(git rev-parse --short HEAD)"
+
+          gh release upload "$TAG" dist/* --clobber
+
+          # Keep the release notes as they are up to their "Demo app" section, and write that one again: the
+          # signing key can be another one now, and the demo no longer is the code of the tag.
+          gh release view "$TAG" --json body --jq .body | tr -d '\r' > "$RUNNER_TEMP/old.md"
+          awk '/^### Demo app/ {exit} {print}' "$RUNNER_TEMP/old.md" > "$RUNNER_TEMP/notes.md"
+          {
+            echo "### Demo app"
+            echo
+            # Keep this text the same as in release.yml.
+            echo "\`PieChart-demo-$VERSION.apk\` is the demo (a settings playground for the chart): a release build shrunk with R8, signed with the $APK_SIGNING. \`PieChart-demo-$VERSION-mapping.txt\` turns its obfuscated stack traces back into readable ones."
+            if [ "$APK_SIGNING" = "debug key" ]; then
+              echo "Because of the debug key, you may need to allow installing from your browser or file manager, and it cannot be updated in place by a build signed with another key."
+            fi
+            echo
+            echo "_The demo app was refreshed on $(date -u +%Y-%m-%d) from \`$REF\` (commit \`$SHORT\`). The library files above are those of the release._"
+          } >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+
+          {
+            echo "### Demo app refreshed"
+            echo
+            echo "\`PieChart-demo-$VERSION.apk\` in release $TAG was rebuilt from \`$REF\` (commit \`$SHORT\`), signed with the $APK_SIGNING."
+          } >> "$GITHUB_STEP_SUMMARY"
