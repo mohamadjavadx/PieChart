@@ -67,7 +67,8 @@
     "verify": "npm run typecheck && npm test && npm run build && node tools/check-package.ts",
     "bench": "node tools/bench.ts",
     "demo": "npm run build && node tools/serve.ts",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "images": "npm run build && node tools/readme-images.ts"
   },
   "peerDependencies": {
     "react": ">=18"

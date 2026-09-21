@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>README images</title>
+  <!-- Draws the pictures of the README with the built library, in a real browser: `node tools/readme-images.ts`. -->
+  <style>
+    html, body { margin: 0; }
+    body { font: 15px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; width: max-content; }
+    .sheet { display: flex; }
+    .panel { box-sizing: border-box; padding: 20px 12px 18px; text-align: center; background: #fff; color: #2b3245; }
+    .panel.dark { background: #12151c; color: #e8ecf5; }
+    .panel svg { display: block; width: var(--size, 300px); height: var(--size, 300px); }
+    .panel h3 { margin: 10px 0 2px; font-size: 16px; font-weight: 650; }
+    .panel p { margin: 0; font-size: 13px; color: #8a93a6; }
+    .panel.dark p { color: #98a1b8; }
+    .rule { width: 1px; background: #e6e9f0; }
+  </style>
+</head>
+<body>
+<div class="sheet" id="sheet"></div>
+<script type="module">
+  import { ChartModel, sceneToSvg, createDefaultCenter, DEFAULT_PALETTE, normalizeData } from "../dist/index.js";
+
+  const LABELS = ["Engineering", "Product", "Design", "Marketing", "Sales", "Support", "Finance", "Legal", "HR", "Operations"];
+  /** The demo app's data: values halve, and the last two are equal, 100 in all. */
+  const rows = (count) => Array.from({ length: count }, (_, i) => {
+    const k = Math.min(i + 1, Math.max(count - 1, 1));
+    return { label: LABELS[i] ?? `Row ${i + 1}`, value: `${100n * 5n ** BigInt(k)}e-${k}`, color: DEFAULT_PALETTE[i % DEFAULT_PALETTE.length] };
+  });
+
+  const LIGHT = { labelColor: "#8A93A6", valueColor: "#1F2633", suffixColor: "#1F2633" };
+  const DARK = { labelColor: "#98A1B8", valueColor: "#E8ECF5", suffixColor: "#E8ECF5" };
+
+  let counter = 0;
+  /** One chart in its final state, as an SVG string. */
+  function chart({ count = 5, size = 300, style = {}, select = 0, group = false, expand = false, dark = false, center = true }) {
+    const model = new ChartModel({
+      clock: () => 0,
+      animation: { revealDuration: 0, dataChangeDuration: 0 },
+      style: { cornerRadiusDp: 4, visualGapDp: 4, selectedShadowOffsetDp: 6, unselectedDim: 0, groupSmallSlices: group, ...style },
+    });
+    model.setSize(size, size, 16);
+    if (center) model.setCenterRenderer(createDefaultCenter(dark ? DARK : LIGHT));
+    model.setData(normalizeData(rows(count)));
+    if (expand) model.expandGroup();
+    if (select !== null) model.setSelectedIndex(select);
+    model.advance(1e9); model.advance(2e9);
+    return sceneToSvg(model.scene(), { idPrefix: `c${counter++}` });
+  }
+
+  const panel = (options, title, note = "", cls = "") =>
+    `<div class="panel ${options.dark ? "dark" : ""} ${cls}" style="--size:${options.size ?? 300}px">${chart(options)}<h3>${title}</h3><p>${note}</p></div>`;
+
+  const SHEETS = {
+    hero: () => [
+      panel({ size: 340 }, "Light", "The selected slice's label and value are in the hole"),
+      panel({ size: 340, dark: true }, "Dark", "The text takes the page's colors"),
+    ],
+    selection: () => [
+      panel({ select: 0 }, "Selected", "It pops out and casts a shadow"),
+      panel({ select: 0, style: { unselectedDim: 0.6 } }, "Others dimmed", "<code>unselectedDim: 0.6</code>"),
+      panel({ select: 2, style: { unselectedDim: 0.6 } }, "Selection moved", "The shadow and the text follow"),
+    ],
+    grouping: () => [
+      panel({ count: 30, group: true, select: 0 }, "Thirty slices", "The small ones are grouped as Other"),
+      panel({ count: 30, group: true, expand: true, select: null }, "Other opened", "The big ones fold into one dimmed arc"),
+    ],
+    styling: () => [
+      panel({ size: 230, style: { holeRadiusRatio: 0.6 } }, "Hole 60%", "<code>holeRadiusRatio: 0.6</code>"),
+      panel({ size: 230, style: { holeRadiusRatio: 0.3 } }, "Hole 30%", "The label is shortened to fit"),
+      panel({ size: 230, style: { cornerRadiusDp: 0, visualGapDp: 0 } }, "Sharp, no gap", "<code>cornerRadiusDp: 0</code>"),
+      panel({ size: 230, style: { cornerRadiusDp: 12, visualGapDp: 10 } }, "Round, wide gaps", "<code>cornerRadiusDp: 12</code>"),
+    ],
+  };
+
+  const name = location.hash.slice(1) || "hero";
+  document.getElementById("sheet").innerHTML = SHEETS[name]().join('<div class="rule"></div>');
+  await document.fonts.ready;
+  // The size of the picture, for whoever takes it to read (with --dump-dom) before taking it
+  const box = document.getElementById("sheet").getBoundingClientRect();
+  document.documentElement.dataset.size = `${Math.ceil(box.width)}x${Math.ceil(box.height)}`;
+</script>
+</body>
+</html>

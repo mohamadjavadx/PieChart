@@ -1,12 +1,45 @@
 # PieChart for the web
 
+[![npm](https://img.shields.io/npm/v/@mohamadjavadx/piechart)](https://www.npmjs.com/package/@mohamadjavadx/piechart)
+
 The web version of the [Android PieChart library](../README.md): the same look and the same features, drawn with
-SVG. It is being built in steps.
+SVG, with no dependencies.
+
+```
+npm install @mohamadjavadx/piechart
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mohamadjavadx/PieChart/web/web/docs/images/web-hero.png" width="640" alt="The same donut chart twice, on a light and on a dark background: the first slice is selected, and its label, value and total are in the hole">
+</p>
 
 | | |
 |---|---|
+| Published | **0.1.0** on [npm](https://www.npmjs.com/package/@mohamadjavadx/piechart) (21 September 2026), with a provenance statement that ties the package to the workflow run that built it, and as a [GitHub Release](https://github.com/mohamadjavadx/PieChart/releases/tag/web-v0.1.0) with the package attached. It is an early release (0.x): the API can still change between minor versions, and each change is in the [changelog](CHANGELOG.md). |
 | Done | **The core** (`src/core`): exact decimals, sweeps and gaps, corner radii, small-slice grouping, the morph planner, hit testing, SVG paths. **The chart** (`src/chart`): its state, selection, group expand and collapse, reveal and morph animations. **SVG** (`src/svg`): a scene as SVG text or patched into the DOM. **The text in the hole** (`src/center`). **Accessibility** (`src/a11y`): screen readers and the keyboard. **Three ways to use it**: the `PieChart` class, a `<pie-chart>` web component (`src/element`) and a React component (`src/react`). |
 | Next | A canvas renderer for charts with thousands of slices, if anyone needs one. |
+
+## What it looks like
+
+Drawn by the library itself, in a browser, in the same states as the Android README's pictures.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mohamadjavadx/PieChart/web/web/docs/images/web-selection.png" width="720" alt="Three charts: the first slice selected with a shadow, the same with the other slices dimmed, and the selection moved to the third slice, with the shadow and the text in the hole following it">
+</p>
+
+Small slices can be grouped into one, which opens into a dimmed arc of the big slices, next to the small ones:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mohamadjavadx/PieChart/web/web/docs/images/web-grouping.png" width="480" alt="Thirty slices with the small ones merged into one gray Other slice, and the same chart with Other opened: the big slices are one dimmed arc, the small slices share the rest of the ring, and the first of them is selected">
+</p>
+
+The hole, the corners and the gaps are settings, and the text in the hole scales to fit:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mohamadjavadx/PieChart/web/web/docs/images/web-styling.png" width="720" alt="Four charts: a hole of 60% and one of 30% where the label is shortened to fit, sharp corners with no gaps, and round corners with wide gaps">
+</p>
+
+## Developing
 
 ```
 npm run demo        # builds, and serves demo pages on http://localhost:8765/demo/ (index, element, react)
@@ -16,13 +49,16 @@ npm run typecheck   # tsc --noEmit, strict, tests included
 npm run build       # ES modules and .d.ts into dist/
 npm run verify      # types, tests, build, and a look at what npm would publish
 npm run bench       # what a frame costs, from 5 to 1000 slices
+npm run images      # draws the pictures of this README into docs/images (needs Chrome)
 ```
 
-Node 22.18 or newer. The source uses only syntax that Node can run as it is, so tests need no build step.
+Node 22.18 or newer. The source uses only syntax that Node can run as it is, so tests need no build step. Every change to this
+folder is checked by the `Web` workflow. To release, see [Releasing](../docs/RELEASING.md#the-web-version): a `web-v<version>` tag
+publishes to npm and creates the GitHub Release.
 
 ## Using it
 
-Install it (`npm install @mohamadjavadx/piechart`), and pick the way that suits your page. All three are the same chart, and the
+Pick the way that suits your page. All three are the same chart, and the
 options, defaults and behavior are those of the Android library, in dp (CSS px here) and with the `…Dim` options from 0 to 1:
 see the Android README's [Styling](../README.md#styling) and [Small slices](../README.md#small-slices).
 
