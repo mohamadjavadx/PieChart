@@ -1,58 +1,84 @@
 # PieChart for the web
 
 The web version of the [Android PieChart library](../README.md): the same look and the same features, drawn with
-SVG. It is being built in steps, and **this first step is the core**: everything that decides *what* is drawn, with
-nothing that touches the DOM, so that any renderer can sit on top of it.
+SVG. It is being built in steps.
 
 | | |
 |---|---|
-| Done | The core (`src/core`): exact decimals, sweeps and gaps, corner radii, grouping of small slices, the morph planner, hit testing, and the SVG path of a slice. |
-| Next | The chart itself: the animated state (reveal, morph, selection), an SVG renderer, then a `<pie-chart>` web component and a React wrapper. |
-
-## The core
-
-A port, function by function, of the Android library's pure Kotlin code. Angles are in degrees, clockwise from 3
-o'clock, which is also how SVG's y-down plane reads them, so the geometry carries over unchanged.
-
-| File | Ports | What |
-|---|---|---|
-| `decimal.ts` | `BigDecimal` | Exact decimals, with Java's `DECIMAL64` division (16 digits, half to even), so totals and shares are exact. |
-| `sliceMath.ts` | `SliceMath.kt` | The gap, the target sweeps (with the flush band of an expanded group), the minimum sweep, corner radii, hit testing. |
-| `grouping.ts` | `Grouping.kt` | Small slices into one "Other" (under the gap plus 2°; the group is given the gap plus 10°), and the expanded layout. |
-| `morph.ts` | `Morph.kt` | Plans a data-change animation: matches slices by id, keeps ghosts of removed ones, moves the band weights. |
-| `ringPath.ts` | `RingPathBuilder.kt` | The outline of a slice as SVG path data: sharp, or with corners that are circles tangent to the edge and to the side. |
-| `layout.ts` | `PieChartView` | From slices to shapes: the ring, the shadow ring, the segments, a slice's outline. |
-| `slices.ts`, `types.ts`, `math.ts` | | Input normalization, the slice types, shared constants. |
-
-It has no dependencies and uses only syntax that Node can run as it is, so there is no build step to test it.
+| Done | **The core** (`src/core`): exact decimals, sweeps and gaps, corner radii, small-slice grouping, the morph planner, hit testing, SVG paths. **The chart** (`src/chart`): its state, selection, group expand and collapse, reveal and morph animations. **SVG** (`src/svg`): a scene as SVG text or patched into the DOM. `PieChart` puts it on a page. |
+| Next | The text in the hole (the center renderer and its fade), a `<pie-chart>` web component, a React wrapper, and accessibility (keyboard and screen readers). |
 
 ```
-npm test            # node --test: 85 tests, no packages needed
+npm run demo        # builds, and serves a demo page on http://localhost:8765/
+npm test            # node --test: 115 tests, no packages needed
 npm install         # once, for the type checker
-npm run typecheck   # tsc --noEmit, strict
+npm run typecheck   # tsc --noEmit, strict, tests included
+npm run build       # ES modules and .d.ts into dist/
 ```
 
-## Kept the same as Android
+Node 22.18 or newer. The source uses only syntax that Node can run as it is, so tests need no build step.
 
-`test/fixtures/core.json` is what the Android library's own Kotlin code answered for many inputs: divisions,
-gaps, sweeps (with and without a band), corner radii over a grid, grouping, morph plans, and hit tests at random
-points. `test/parity.test.ts` runs every one of them through this port. Kotlin computes in 32-bit floats and this in
-64-bit, so numbers agree to a small tolerance; exact decimals agree to the last digit.
+## Using it
 
-The file comes from `tools/kotlin-fixtures`, a small JVM program that compiles the library's Kotlin files as they
-are (not copies) and writes the answers. After a change to the Kotlin logic, from the repository root:
+```ts
+import { PieChart } from "./dist/index.js";
 
+const chart = new PieChart(document.querySelector("#chart")!, {
+  padding: 16,
+  style: { cornerRadiusDp: 4, visualGapDp: 4, groupSmallSlices: true },
+});
+chart.setData([
+  { id: 1, label: "Rent", value: "1200", color: "#F24822" },
+  { id: 2, label: "Food", value: "450.50", color: "#FF9E42" },
+]);
+chart.model.onSelectionChanged = (slice) => console.log(slice?.data.label);
 ```
-./gradlew -p web/tools/kotlin-fixtures run
-cd web && npm test
-```
 
-If the Android logic changes, the fixtures change, and the parity test says what the port still has to do.
+The options, their defaults, and the behavior are those of the Android library, in dp (CSS px here) and with `…Dim`
+options from 0 to 1: see the Android README's [Styling](../README.md#styling) and [Small slices](../README.md#small-slices).
+Data given before the container has a size waits for it, so the entry animation is not played unseen.
+
+## Layers
+
+| Path | What |
+|---|---|
+| `src/core` | A port, function by function, of the Android library's pure Kotlin code (`SliceMath`, `Grouping`, `Morph`, `RingPathBuilder`), and `Decimal`, exact decimals with Java's `DECIMAL64` division. Nothing here touches the DOM. |
+| `src/chart/model.ts` | `ChartModel`, the port of `PieChartView`'s state machine: data, selection, grouping, animations. Time comes in through `advance(now)`, so it runs (and is tested) without a browser. |
+| `src/chart/scene.ts` | What to draw for one frame: shapes in paint order, with colors and opacities. The port of the view's drawing, with the canvas taken out. |
+| `src/svg` | A scene as a tree of SVG elements: written as text (`sceneToSvg`, also for a server) or patched into the DOM (`patchChildren`), which keeps elements and sets only what changed. |
+| `src/chart/pieChart.ts` | `PieChart`: an SVG in an element that follows its size, runs the animation loop and turns pointer events into taps. |
+
+## How it is kept the same as Android
+
+Three checks, from the cheapest to the most convincing:
+
+1. **Unit tests** for every function, including geometry checks that read the generated path data back and confirm that every
+   rounded corner joins its neighbors tangentially.
+2. **Parity fixtures.** `test/fixtures/core.json` is what the Android library's own Kotlin code answered for many inputs:
+   divisions, gaps, sweeps (with and without a band), corner radii over a grid, grouping, morph plans, and hit tests at
+   random points. `test/parity.test.ts` runs every one of them through this port. Kotlin computes in 32-bit floats and this
+   in 64-bit, so numbers agree to a small tolerance; exact decimals agree to the last digit. The file comes from
+   `tools/kotlin-fixtures`, a small JVM program that compiles the library's Kotlin files as they are (not copies). After a
+   change to the Kotlin logic, from the repository root: `./gradlew -p web/tools/kotlin-fixtures run`, then `npm test`.
+3. **Pixels.** The web chart and the Android demo were drawn in the same states at the same size (756 px, 2.875 density)
+   and compared over the ring. The remaining difference is anti-aliasing at the edges:
+
+   | State | Mean error (of 255) | Ring pixels off by more than 32 |
+   |---|---|---|
+   | 5 slices, the first selected | 0.49 | 0.26% |
+   | The second selected, the others dimmed | 0.26 | 0.01% |
+   | 7 slices | 0.48 | 0.23% |
+   | 30 slices, small ones grouped | 0.61 | 0.22% |
+   | The group open: the dimmed arc, 24 small slices, the selected one's shadow | 0.47 | 0.18% |
+
+   No pixel was off by more than 96. To repeat it (macOS, with the Android demo on an emulator): render a state with
+   `node tools/svg-of.ts <scenario> out.svg`, turn it into a PNG with `qlmanage -t -s 756 -o . out.svg`, crop the chart view
+   from a screenshot of the demo, and run `python3 tools/compare-png.py web.png android.png`.
 
 ## Differences from Android on purpose
 
-- Values are decimal strings, numbers or bigints (a number is taken by its shortest decimal form), and colors are
-  any CSS color, not an ARGB int.
-- Ids are compared with `===` and can be strings, numbers or symbols; the group's slice has the id `OtherSliceId`
-  (a symbol).
+- Values are decimal strings, numbers or bigints (a number is taken by its shortest decimal form), and colors are any CSS color,
+  not an ARGB int.
+- Ids are compared with `===` and can be strings, numbers or symbols; the group's slice has the id `OtherSliceId` (a symbol).
 - The group's label is a parameter (`otherLabel`) instead of a fixed English word.
+- "dp" is a CSS px.
