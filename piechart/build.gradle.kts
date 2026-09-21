@@ -10,7 +10,7 @@ plugins {
 // Release details. Publishing to a remote repository refuses to run while any TODO/OWNER is left.
 // ---------------------------------------------------------------------------------------------
 group = "io.github.mohamadjavadx"
-version = "1.0.0"
+version = "2.0.0"
 
 val pomName = "PieChart"
 val pomDescription = "An animated pie / donut chart view for Android, with tap selection and " +
