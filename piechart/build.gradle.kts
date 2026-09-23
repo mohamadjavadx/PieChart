@@ -24,12 +24,11 @@ val pomDeveloperName = "Mohamadjavad Pourmoradian"
 android {
     namespace = "io.github.mohamadjavadx.piechart"
     // The library uses no API above minSdk, so this is only how new the Android APIs *available while building*
-    // may be, not a requirement on anyone's device. compileSdk can't go below minSdk, so 24 is the lowest this
-    // can be, and the lowest anyone's minCompileSdk error can therefore go (see docs/RELEASING.md). Not
-    // installed on this machine (only 34, 35 and 36.1 are): building locally needs `sdkmanager
-    // "platforms;android-24"` first, or CI, which has it. Raise it only when a change actually needs a newer API.
+    // may be, not a requirement on anyone's device. Keep it conservative: apps and their AGP lag behind the
+    // latest SDK, and a compileSdk they have not caught up to yet blocks them from using this library at all
+    // (see docs/RELEASING.md). Raise it only when a change actually needs a newer API.
     compileSdk {
-        version = release(24)
+        version = release(34)
     }
 
     defaultConfig {
@@ -55,11 +54,8 @@ android {
         }
     }
     compileOptions {
-        // Java 9+ bytecode needs compileSdk 30 or above, whatever the code actually calls; 8 is what lets
-        // compileSdk go all the way down to minSdk. The library has no Java source to begin with (it's Kotlin
-        // only), and Java 8 is a language level every current AGP and JDK still fully supports.
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 }
 
