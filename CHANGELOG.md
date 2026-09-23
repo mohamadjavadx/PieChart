@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.1
+
+### Fixed
+
+- **2.0.0 needed `compileSdk` 36.** It was accidentally published built against a preview Android SDK, so any app on an
+  older `compileSdk` (or an Android Gradle Plugin too old to know about 36) failed to build against it at all, with an
+  "AAR metadata" error. The library uses nothing above `minSdk`, so this was never intentional. Down to `compileSdk` 24
+  (Android 7.0), the lowest it can go since `compileSdk` can't be under `minSdk`: whatever `compileSdk` an app already
+  has works now. No source change, so 1.0.0's and 2.0.0's *Upgrading* notes below still apply when moving from an
+  earlier version; nothing here needs a code change.
+
 ## 2.0.0
 
 Small slices can be grouped into one that opens up on tap, sizes can be given in dp, and `ensureRenderableSlices` is now

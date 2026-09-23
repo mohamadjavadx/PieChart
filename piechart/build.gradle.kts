@@ -10,7 +10,7 @@ plugins {
 // Release details. Publishing to a remote repository refuses to run while any TODO/OWNER is left.
 // ---------------------------------------------------------------------------------------------
 group = "io.github.mohamadjavadx"
-version = "2.0.0"
+version = "2.0.1"
 
 val pomName = "PieChart"
 val pomDescription = "An animated pie / donut chart view for Android, with tap selection and " +
@@ -23,10 +23,13 @@ val pomDeveloperName = "Mohamadjavad Pourmoradian"
 
 android {
     namespace = "io.github.mohamadjavadx.piechart"
+    // The library uses no API above minSdk, so this is only how new the Android APIs *available while building*
+    // may be, not a requirement on anyone's device. compileSdk can't go below minSdk, so 24 is the lowest this
+    // can be, and the lowest anyone's minCompileSdk error can therefore go (see docs/RELEASING.md). Not
+    // installed on this machine (only 34, 35 and 36.1 are): building locally needs `sdkmanager
+    // "platforms;android-24"` first, or CI, which has it. Raise it only when a change actually needs a newer API.
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(24)
     }
 
     defaultConfig {
