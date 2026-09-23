@@ -10,7 +10,7 @@ plugins {
 // Release details. Publishing to a remote repository refuses to run while any TODO/OWNER is left.
 // ---------------------------------------------------------------------------------------------
 group = "io.github.mohamadjavadx"
-version = "2.0.2"
+version = "2.0.0"
 
 val pomName = "PieChart"
 val pomDescription = "An animated pie / donut chart view for Android, with tap selection and " +
@@ -23,12 +23,10 @@ val pomDeveloperName = "Mohamadjavad Pourmoradian"
 
 android {
     namespace = "io.github.mohamadjavadx.piechart"
-    // The library uses no API above minSdk, so this is only how new the Android APIs *available while building*
-    // may be, not a requirement on anyone's device. Keep it conservative: apps and their AGP lag behind the
-    // latest SDK, and a compileSdk they have not caught up to yet blocks them from using this library at all
-    // (see docs/RELEASING.md). Raise it only when a change actually needs a newer API.
     compileSdk {
-        version = release(34)
+        version = release(36) {
+            minorApiLevel = 1
+        }
     }
 
     defaultConfig {

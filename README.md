@@ -58,7 +58,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of your app
 dependencies {
-    implementation("com.github.mohamadjavadx:PieChart:v2.0.1")
+    implementation("com.github.mohamadjavadx:PieChart:v2.0.0")
 }
 ```
 
